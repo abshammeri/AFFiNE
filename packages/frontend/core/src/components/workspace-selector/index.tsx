@@ -6,6 +6,7 @@ import {
   type WorkspaceMetadata,
   WorkspacesService,
 } from '@affine/core/modules/workspace';
+import { getLastPageId } from '@affine/core/utils/last-page';
 import { track } from '@affine/track';
 import {
   useLiveData,
@@ -164,17 +165,16 @@ export const WorkspaceNavigator = ({
           }
         });
 
+      const target = getLastPageId(workspaceMetadata.id) ?? 'all';
+
       if (document.startViewTransition) {
         document.startViewTransition(() => {
           closeInactiveViews();
-          jumpToPage(workspaceMetadata.id, 'all');
-          return new Promise(resolve =>
-            setTimeout(resolve, 150)
-          ); /* start transition after 150ms */
+          jumpToPage(workspaceMetadata.id, target);
         });
       } else {
         closeInactiveViews();
-        jumpToPage(workspaceMetadata.id, 'all');
+        jumpToPage(workspaceMetadata.id, target);
       }
     },
     [jumpToPage, onSelectWorkspace, workbench]

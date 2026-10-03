@@ -2,16 +2,16 @@ import {
   Masonry,
   type MasonryGroup,
   type MasonryItem,
-  useConfirmModal,
 } from '@affine/component';
 import { DocsService } from '@affine/core/modules/doc';
 import { WorkspacePropertyService } from '@affine/core/modules/workspace-property';
-import { Trans, useI18n } from '@affine/i18n';
+import { Trans } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
 import { cssVarV2 } from '@toeverything/theme/v2';
 import { memo, useCallback, useContext, useEffect, useMemo } from 'react';
 
 import { EmptyDocs } from '../../affine/empty';
+import { moveToTrashWithUndo } from '../../affine/move-to-trash-with-undo';
 import { ListFloatingToolbar } from '../../page-list/components/list-floating-toolbar';
 import { SystemPropertyTypes } from '../../system-property-types';
 import { WorkspacePropertyTypes } from '../../workspace-property-types';
@@ -117,7 +117,6 @@ export const DocsExplorer = ({
     }
   ) => void;
 }) => {
-  const t = useI18n();
   const contextValue = useContext(DocExplorerContext);
   const docsService = useService(DocsService);
 
@@ -127,8 +126,6 @@ export const DocsExplorer = ({
   const selectMode = useLiveData(contextValue.selectMode$);
   const selectedDocIds = useLiveData(contextValue.selectedDocIds$);
   const collapsedGroups = useLiveData(contextValue.collapsedGroups$);
-
-  const { openConfirmModal } = useConfirmModal();
 
   const masonryItems = useMemo(() => {
     const items = groups.map((group: any) => {
@@ -178,39 +175,18 @@ export const DocsExplorer = ({
       return;
     }
 
-    openConfirmModal({
-      title: t['com.affine.moveToTrash.confirmModal.title.multiple']({
-        number: selectedDocIds.length.toString(),
-      }),
-      description: t[
-        'com.affine.moveToTrash.confirmModal.description.multiple'
-      ]({
-        number: selectedDocIds.length.toString(),
-      }),
-      cancelText: t['com.affine.confirmModal.button.cancel'](),
-      confirmText: t.Delete(),
-      confirmButtonOptions: {
-        variant: 'error',
-      },
-      onConfirm: async () => {
-        const selectedDocIds = contextValue.selectedDocIds$.value;
-        await Promise.all(
-          selectedDocIds.map(async docId => {
-            await docsService.list.doc$(docId).value?.moveToTrash();
-          })
-        );
-        handleCloseFloatingToolbar();
-      },
-    });
+    const docs = contextValue.selectedDocIds$.value
+      .map(docId => docsService.list.doc$(docId).value)
+      .filter(doc => !!doc);
+    moveToTrashWithUndo(docs).catch(console.error);
+    handleCloseFloatingToolbar();
   }, [
     contextValue.selectedDocIds$,
     disableMultiDelete,
     docsService.list,
     handleCloseFloatingToolbar,
     onDelete,
-    openConfirmModal,
     selectedDocIds.length,
-    t,
   ]);
   const handleMultiRestore = useCallback(() => {
     const selectedDocIds = contextValue.selectedDocIds$.value;

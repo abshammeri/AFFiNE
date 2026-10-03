@@ -5,6 +5,7 @@ import {
   toast,
   useConfirmModal,
 } from '@affine/component';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import type { DocRecord } from '@affine/core/modules/doc';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
 import { GuardService } from '@affine/core/modules/permissions';
@@ -138,7 +139,6 @@ export const QuickDelete = memo(function QuickDelete({
   ...iconButtonProps
 }: QuickActionProps) {
   const t = useI18n();
-  const { openConfirmModal } = useConfirmModal();
   const contextValue = useContext(DocExplorerContext);
   const guardService = useService(GuardService);
   const quickTrash = useLiveData(contextValue.quickTrash$);
@@ -153,33 +153,22 @@ export const QuickDelete = memo(function QuickDelete({
       }
 
       track.allDocs.list.docMenu.deleteDoc();
-      openConfirmModal({
-        title: t['com.affine.moveToTrash.confirmModal.title'](),
-        description: t['com.affine.moveToTrash.confirmModal.description']({
-          title: doc.title$.value || t['Untitled'](),
-        }),
-        cancelText: t['com.affine.confirmModal.button.cancel'](),
-        confirmText: t.Delete(),
-        confirmButtonOptions: {
-          variant: 'error',
-        },
-        onConfirm: async () => {
-          try {
-            const canTrash = await guardService.can('Doc_Trash', doc.id);
-            if (!canTrash) {
-              toast(t['com.affine.no-permission']());
-              return;
-            }
-            await doc.moveToTrash();
-          } catch (error) {
-            console.error(error);
-            const userFriendlyError = UserFriendlyError.fromAny(error);
-            toast(t[`error.${userFriendlyError.name}`](userFriendlyError.data));
+      (async () => {
+        try {
+          const canTrash = await guardService.can('Doc_Trash', doc.id);
+          if (!canTrash) {
+            toast(t['com.affine.no-permission']());
+            return;
           }
-        },
-      });
+          await moveToTrashWithUndo([doc]);
+        } catch (error) {
+          console.error(error);
+          const userFriendlyError = UserFriendlyError.fromAny(error);
+          toast(t[`error.${userFriendlyError.name}`](userFriendlyError.data));
+        }
+      })().catch(console.error);
     },
-    [doc, guardService, onClick, openConfirmModal, t]
+    [doc, guardService, onClick, t]
   );
 
   if (!quickTrash) {

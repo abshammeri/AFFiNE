@@ -11,7 +11,7 @@ import {
 import { getCurrentDocIdFromUrl } from '@affine-test/kit/utils/url';
 import { expect } from '@playwright/test';
 
-test('New a page ,then open it and show delete modal', async ({
+test('New a page ,then open it, delete it and undo', async ({
   page,
   workspace,
 }) => {
@@ -28,14 +28,19 @@ test('New a page ,then open it and show delete modal', async ({
   await clickPageMoreActions(page);
   const deleteBtn = page.getByTestId('editor-option-menu-delete');
   await deleteBtn.click();
-  const confirmTip = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Moved to trash')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByTestId('all-pages').click();
+  await expect(
+    getPageByTitle(page, 'this is a new page to delete')
+  ).toBeVisible();
   const currentWorkspace = await workspace.current();
 
   expect(currentWorkspace.meta.flavour).toContain('local');
 });
 
-test('New a page ,then go to all pages and show delete modal', async ({
+test('New a page ,then go to all pages, delete it and undo', async ({
   page,
   workspace,
 }) => {
@@ -52,8 +57,13 @@ test('New a page ,then go to all pages and show delete modal', async ({
   await getPageOperationButton(page, newPageId).click();
   const deleteBtn = page.getByTestId('doc-list-operation-trash');
   await deleteBtn.click();
-  const confirmTip = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Moved to trash')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByTestId('all-pages').click();
+  await expect(
+    getPageByTitle(page, 'this is a new page to delete')
+  ).toBeVisible();
   const currentWorkspace = await workspace.current();
 
   expect(currentWorkspace.meta.flavour).toContain('local');

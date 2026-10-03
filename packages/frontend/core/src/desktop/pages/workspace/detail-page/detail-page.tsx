@@ -34,6 +34,7 @@ import {
 } from '@affine/core/modules/workbench';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { isNewTabTrigger } from '@affine/core/utils';
+import { setLastPageId } from '@affine/core/utils/last-page';
 import { ServerFeature } from '@affine/graphql';
 import track from '@affine/track';
 import { DisposableGroup } from '@blocksuite/affine/global/disposable';
@@ -454,15 +455,17 @@ const DetailPageImpl = memo(function DetailPageImpl() {
 export const Component = () => {
   const params = useParams();
   const recentPages = useService(RecentDocsService);
+  const workspaceId = useService(WorkspaceService).workspace.id;
 
   useEffect(() => {
     if (params.pageId) {
       const pageId = params.pageId;
       localStorage.setItem('last_page_id', pageId);
+      setLastPageId(workspaceId, pageId);
 
       recentPages.addRecentDoc(pageId);
     }
-  }, [params, recentPages]);
+  }, [params, recentPages, workspaceId]);
 
   const pageId = params.pageId;
   const canAccess = useGuard('Doc_Read', pageId ?? '');
