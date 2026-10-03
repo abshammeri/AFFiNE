@@ -704,6 +704,54 @@ const DefaultCodeBlockLineNumberSettings = () => {
   );
 };
 
+const textDirectionOptions = ['none', 'ltr', 'rtl', 'auto'] as const;
+
+const TextDirectionSettings = () => {
+  const t = useI18n();
+  const { editorSettingService } = useServices({ EditorSettingService });
+  const settings = useLiveData(editorSettingService.editorSetting.settings$);
+
+  const items = useMemo(
+    () =>
+      textDirectionOptions.map(value => ({
+        value,
+        label:
+          t[
+            `com.affine.settings.editorSettings.general.text-direction.${value}`
+          ](),
+        testId: `text-direction-${value}`,
+      })) satisfies RadioItem[],
+    [t]
+  );
+
+  const onChange = useCallback(
+    (value: EditorSettingSchema['textDirection']) => {
+      editorSettingService.editorSetting.set('textDirection', value);
+    },
+    [editorSettingService.editorSetting]
+  );
+
+  return (
+    <SettingRow
+      name={t[
+        'com.affine.settings.editorSettings.general.text-direction.title'
+      ]()}
+      desc={t[
+        'com.affine.settings.editorSettings.general.text-direction.description'
+      ]()}
+    >
+      <RadioGroup
+        items={items}
+        value={settings.textDirection}
+        width={250}
+        className={styles.settingWrapper}
+        onChange={onChange}
+        data-testid="text-direction-setting"
+      />
+    </SettingRow>
+  );
+};
+
 export const General = () => {
   const t = useI18n();
 
@@ -713,6 +761,7 @@ export const General = () => {
       <FontFamilySettings />
       <CustomFontFamilySettings />
       <FontSizeSettings />
+      <TextDirectionSettings />
       <NewDocDefaultModeSettings />
       <NewDocDateTitleSettings />
       <DefaultCodeBlockLineNumberSettings />

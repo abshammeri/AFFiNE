@@ -12,7 +12,13 @@ export const listPrefix = css`
   .affine-list-block__numbered {
     min-width: 22px;
     height: 24px;
-    margin-left: 2px;
+    margin-inline-start: 2px;
+  }
+
+  /* the number box is dir="ltr" so "1." / "a." stay readable; mirror its
+     alignment inside RTL rows so the gap to the text matches LTR */
+  .affine-list-rich-text-wrapper:dir(rtl) > .affine-list-block__numbered {
+    justify-content: flex-end;
   }
 
   .affine-list-block__todo-prefix {

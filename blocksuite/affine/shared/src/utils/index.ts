@@ -24,6 +24,7 @@ export * from './safe-html';
 export * from './signal';
 export * from './string';
 export * from './svg';
+export * from './text-direction';
 export * from './title';
 export * from './url';
 export * from './virtual-padding';

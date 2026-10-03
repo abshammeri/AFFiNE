@@ -1,4 +1,23 @@
 /*
+ * Geist (Variable) - default sans font. No Arabic glyphs: Arabic falls
+ * through to ui-sans-serif (see theme.css.ts).
+ */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-display: swap;
+  src: url(../fonts/geist/Geist-Variable.woff2) format('woff2');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: italic;
+  font-display: swap;
+  src: url(../fonts/geist/Geist-Italic-Variable.woff2) format('woff2');
+  font-weight: 100 900;
+}
+
+/*
  * Inter (Variable)
  */
 @font-face {

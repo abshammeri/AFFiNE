@@ -12,17 +12,23 @@ import { focusTextModel } from '@blocksuite/affine-rich-text';
 import { EDGELESS_TOP_CONTENTEDITABLE_SELECTOR } from '@blocksuite/affine-shared/consts';
 import {
   DocModeProvider,
+  getGlobalTextDirection,
   type IconData,
   IconPickerServiceIdentifier,
   IconType,
 } from '@blocksuite/affine-shared/services';
 import type { UniComponent } from '@blocksuite/affine-shared/types';
+import {
+  detectTextDirection,
+  resolveTextDirection,
+} from '@blocksuite/affine-shared/utils';
 import * as icons from '@blocksuite/icons/lit';
 import type { BlockComponent } from '@blocksuite/std';
-import { type Signal } from '@preact/signals-core';
+import { computed, type Signal } from '@preact/signals-core';
 import { cssVarV2 } from '@toeverything/theme/v2';
 import type { TemplateResult } from 'lit';
 import { html } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { type StyleInfo, styleMap } from 'lit/directives/style-map.js';
 
 import {
@@ -213,6 +219,29 @@ export class CalloutBlockComponent extends CaptionedBlockComponent<CalloutBlockM
     return this.rootComponent;
   }
 
+  /**
+   * The callout's own text lives in its children, each of which sets its own
+   * `dir`, so `dir="auto"` on the callout can't see it. Resolve `auto` from the
+   * first child with text instead, so the icon follows the content's side.
+   */
+  private readonly _dir$ = computed(() => {
+    const dir = resolveTextDirection(
+      this.model.props.textDirection$?.value,
+      getGlobalTextDirection(this.std)
+    );
+    if (dir !== 'auto') return dir;
+    for (const child of this.model.children) {
+      const deltas = child.text?.deltas$.value;
+      if (!deltas) continue;
+      const text = deltas
+        .map(d => (typeof d.insert === 'string' ? d.insert : ''))
+        .join('');
+      const detected = detectTextDirection(text);
+      if (detected) return detected;
+    }
+    return 'auto';
+  });
+
   override renderBlock() {
     const icon = this.model.props.icon$.value;
     const backgroundColorName = this.model.props.backgroundColorName$.value;
@@ -229,6 +258,7 @@ export class CalloutBlockComponent extends CaptionedBlockComponent<CalloutBlockM
     return html`
       <div
         class="${calloutBlockContainerStyles}"
+        dir=${ifDefined(this._dir$.value)}
         @click=${this._handleBlockClick}
         style=${styleMap({
           backgroundColor: backgroundColor ?? 'transparent',

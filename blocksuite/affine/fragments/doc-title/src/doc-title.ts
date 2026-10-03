@@ -258,6 +258,7 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
           isEmpty ? 'doc-title-container-empty' : ''
         }"
         data-block-is-title="true"
+        dir="auto"
       >
         <rich-text
           .yText=${this._rootModel?.props.title.yText}

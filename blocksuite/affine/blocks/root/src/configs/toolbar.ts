@@ -9,7 +9,9 @@ import {
   promptDocTitle,
 } from '@blocksuite/affine-block-embed';
 import {
+  TEXT_DIRECTION_FLAVOURS,
   updateBlockAlign,
+  updateBlockTextDirection,
   updateBlockType,
 } from '@blocksuite/affine-block-note';
 import type { HighlightType } from '@blocksuite/affine-components/highlight-dropdown-menu';
@@ -28,10 +30,12 @@ import {
   EmbedLinkedDocBlockSchema,
   EmbedSyncedDocBlockSchema,
   type TextAlign,
+  type TextDirection,
 } from '@blocksuite/affine-model';
 import {
   textAlignConfigs,
   textConversionConfigs,
+  textDirectionConfigs,
 } from '@blocksuite/affine-rich-text';
 import {
   copySelectedModelsCommand,
@@ -197,6 +201,71 @@ const alignActionGroup = {
                 <editor-menu-action
                   aria-label=${name}
                   @click=${() => update(textAlign)}
+                >
+                  ${icon}<span class="label">${name}</span>
+                </editor-menu-action>
+              `
+            )}
+          </div>
+        </editor-menu-button>
+      `,
+    };
+  },
+} as const satisfies ToolbarActionGenerator;
+
+const textDirectionActionGroup = {
+  id: 'b.direction',
+  when: ({ chain }) => isFormatSupported(chain).run()[0],
+  generate({ chain }) {
+    const [ok, { selectedModels = [] }] = chain
+      .tryAll(chain => [
+        chain.pipe(getTextSelectionCommand),
+        chain.pipe(getBlockSelectionsCommand),
+      ])
+      .pipe(getSelectedModelsCommand, { types: ['text', 'block'] })
+      .run();
+    if (!ok) return null;
+
+    const models = selectedModels.filter(model =>
+      TEXT_DIRECTION_FLAVOURS.has(model.flavour)
+    );
+    if (models.length === 0) return null;
+
+    const current =
+      getMostCommonValue(
+        models.map(({ props }) => props as { textDirection?: TextDirection }),
+        'textDirection'
+      ) ?? null;
+    const active =
+      textDirectionConfigs.find(
+        ({ textDirection }) => textDirection === current
+      ) ?? textDirectionConfigs[textDirectionConfigs.length - 1];
+    const update = (textDirection: TextDirection | null) => {
+      chain.pipe(updateBlockTextDirection, { textDirection }).run();
+    };
+
+    return {
+      content: html`
+        <editor-menu-button
+          .contentPadding="${'8px'}"
+          .button=${html`
+            <editor-icon-button
+              aria-label="Text direction"
+              .tooltip="${'Text direction'}"
+            >
+              ${active.icon} ${EditorChevronDown}
+            </editor-icon-button>
+          `}
+        >
+          <div data-size="large" data-orientation="vertical">
+            ${repeat(
+              textDirectionConfigs,
+              item => item.name,
+              ({ textDirection, name, icon }) => html`
+                <editor-menu-action
+                  aria-label=${name}
+                  ?data-selected=${active.textDirection === textDirection}
+                  @click=${() => update(textDirection)}
                 >
                   ${icon}<span class="label">${name}</span>
                 </editor-menu-action>
@@ -393,6 +462,7 @@ export const builtinToolbarConfig = {
   actions: [
     conversionsActionGroup,
     alignActionGroup,
+    textDirectionActionGroup,
     inlineTextActionGroup,
     highlightActionGroup,
     turnIntoDatabase,

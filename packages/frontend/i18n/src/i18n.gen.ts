@@ -5799,6 +5799,30 @@ export function useAFFiNEI18N(): {
       */
     ["com.affine.settings.editorSettings.general.default-new-doc.title"](): string;
     /**
+      * `Text direction`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.title"](): string;
+    /**
+      * `Default writing direction for text blocks. Blocks can override it from the toolbar or slash menu. Auto picks the direction from each block's first letter.`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.description"](): string;
+    /**
+      * `None`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.none"](): string;
+    /**
+      * `LTR`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.ltr"](): string;
+    /**
+      * `RTL`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.rtl"](): string;
+    /**
+      * `Auto`
+      */
+    ["com.affine.settings.editorSettings.general.text-direction.auto"](): string;
+    /**
       * `Auto-title new docs with current date`
       */
     ["com.affine.settings.editorSettings.general.auto-date-title.title"](): string;

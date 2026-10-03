@@ -10,8 +10,14 @@ import {
   BLOCK_CHILDREN_CONTAINER_PADDING_LEFT,
   EDGELESS_TOP_CONTENTEDITABLE_SELECTOR,
 } from '@blocksuite/affine-shared/consts';
-import { DocModeProvider } from '@blocksuite/affine-shared/services';
-import { getViewportElement } from '@blocksuite/affine-shared/utils';
+import {
+  DocModeProvider,
+  getGlobalTextDirection,
+} from '@blocksuite/affine-shared/services';
+import {
+  getViewportElement,
+  resolveTextDirection,
+} from '@blocksuite/affine-shared/utils';
 import type { BlockComponent } from '@blocksuite/std';
 import { BlockSelection, TextSelection } from '@blocksuite/std';
 import {
@@ -23,6 +29,7 @@ import { effect } from '@preact/signals-core';
 import { html, nothing, type TemplateResult } from 'lit';
 import { query, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -153,13 +160,17 @@ export class ListBlockComponent extends CaptionedBlockComponent<ListBlockModel> 
     const textAlignStyle = styleMap({
       textAlign: this.model.props.textAlign$?.value,
     });
+    const dir = resolveTextDirection(
+      this.model.props.textDirection$?.value,
+      getGlobalTextDirection(this.std)
+    );
 
     const childrenId = `list-children-${this.model.id}`;
     const children = html`<div
       id=${childrenId}
       class="affine-block-children-container"
       style=${styleMap({
-        paddingLeft: `${BLOCK_CHILDREN_CONTAINER_PADDING_LEFT}px`,
+        paddingInlineStart: `${BLOCK_CHILDREN_CONTAINER_PADDING_LEFT}px`,
         display: collapsed ? 'none' : undefined,
       })}
     >
@@ -167,7 +178,11 @@ export class ListBlockComponent extends CaptionedBlockComponent<ListBlockModel> 
     </div>`;
 
     return html`
-      <div class=${'affine-list-block-container'} style="${textAlignStyle}">
+      <div
+        class=${'affine-list-block-container'}
+        style="${textAlignStyle}"
+        dir=${ifDefined(dir)}
+      >
         <div
           class=${classMap({
             'affine-list-rich-text-wrapper': true,
