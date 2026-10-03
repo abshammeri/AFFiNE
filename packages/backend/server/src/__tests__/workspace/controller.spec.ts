@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { PassThrough } from 'node:stream';
 
 import { HttpStatus } from '@nestjs/common';
@@ -312,6 +313,86 @@ test('source-scoped blob controller closes a failed stream', async t => {
     { message: 'read failed' }
   );
   t.true(closeBlobStreamV1.calledOnceWithExactly('failed-stream'));
+});
+
+test('source-scoped blob controller caches content-addressed blobs', async t => {
+  const key = createHash('sha256').update('hello').digest('base64url');
+  const openBlobV1 = Sinon.stub().resolves({
+    streamId: 'cached-stream',
+    mime: 'text/plain',
+    size: 5,
+    lastModifiedMs: 0,
+  });
+  const readBlobStreamChunkV1 = Sinon.stub().resolves({
+    body: Buffer.from('hello'),
+    done: true,
+  });
+  const closeBlobStreamV1 = Sinon.stub().resolves();
+  const controller = new WorkspacesController(
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {
+      openBlobV1,
+      readBlobStreamChunkV1,
+      closeBlobStreamV1,
+    } as unknown as BackendRuntimeProvider
+  );
+  const createResponse = (ifNoneMatch?: string) => {
+    const headers: Record<string, string> = {};
+    const body: Buffer[] = [];
+    const response = Object.assign(new PassThrough(), {
+      req: { headers: { 'if-none-match': ifNoneMatch } },
+      statusCode: 200,
+      setHeader(name: string, value: string | number) {
+        headers[name.toLowerCase()] = String(value);
+        return this;
+      },
+      getHeader(name: string) {
+        return headers[name.toLowerCase()];
+      },
+      status(code: number) {
+        response.statusCode = code;
+        return response;
+      },
+    });
+    response.on('data', chunk => body.push(Buffer.from(chunk)));
+    return { response, headers, body };
+  };
+
+  const fresh = createResponse();
+  await controller.blobV1(
+    undefined,
+    'workspace',
+    key,
+    'currentDoc',
+    'space:doc',
+    undefined,
+    fresh.response as never
+  );
+  t.is(fresh.response.statusCode, 200);
+  t.is(fresh.headers['cache-control'], 'private, max-age=31536000, immutable');
+  t.is(fresh.headers['etag'], `"${key}"`);
+  t.is(Buffer.concat(fresh.body).toString(), 'hello');
+
+  const cached = createResponse(`W/"other", "${key}"`);
+  await controller.blobV1(
+    undefined,
+    'workspace',
+    key,
+    'currentDoc',
+    'space:doc',
+    undefined,
+    cached.response as never
+  );
+  t.is(cached.response.statusCode, 304);
+  t.is(cached.headers['etag'], `"${key}"`);
+  t.is(cached.body.length, 0);
+  t.is(openBlobV1.callCount, 2);
+  t.is(readBlobStreamChunkV1.callCount, 1);
+  t.deepEqual(closeBlobStreamV1.args, [['cached-stream'], ['cached-stream']]);
 });
 
 // doc
