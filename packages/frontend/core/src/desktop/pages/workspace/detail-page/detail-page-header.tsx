@@ -13,6 +13,7 @@ import { PageHeaderMenuButton } from '@affine/core/blocksuite/block-suite-header
 import { DetailPageHeaderPresentButton } from '@affine/core/blocksuite/block-suite-header/present/detail-header-present-button';
 import { BlocksuiteHeaderTitle } from '@affine/core/blocksuite/block-suite-header/title';
 import { EditorModeSwitch } from '@affine/core/blocksuite/block-suite-mode-switch';
+import { DocSyncStatusIndicator } from '@affine/core/components/doc-sync-status';
 import { useRegisterCopyLinkCommands } from '@affine/core/components/hooks/affine/use-register-copy-link-commands';
 import { HeaderDivider } from '@affine/core/components/pure/header';
 import { DocService } from '@affine/core/modules/doc';
@@ -120,6 +121,7 @@ export function JournalPageHeader({ page, workspace }: PageHeaderProps) {
         <JournalWeekDatePicker page={page} />
       </div>
       <TemplateMark className={styles.journalTemplateMark} />
+      <DocSyncStatusIndicator docId={page.id} />
       {hideToday ? null : <JournalTodayButton />}
       <HeaderDivider />
       <PageHeaderMenuButton
@@ -176,6 +178,8 @@ export function NormalPageHeader({ page, workspace }: PageHeaderProps) {
       </div>
 
       <div className={styles.spacer} />
+
+      <DocSyncStatusIndicator docId={page.id} />
 
       {!hidePresent ? <DetailPageHeaderPresentButton /> : null}
 

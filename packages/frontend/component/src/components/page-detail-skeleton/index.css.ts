@@ -52,6 +52,13 @@ export const text = style({
     },
   },
 });
+export const stillSyncingTitle = style({
+  marginTop: '12px',
+  fontSize: cssVar('fontBase'),
+  lineHeight: 1.6,
+  fontWeight: 500,
+  color: cssVarV2('text/primary'),
+});
 export const actionButton = style({ marginTop: '24px' });
 export const mobileActionButton = style({
   padding: '8px 18px',

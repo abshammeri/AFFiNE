@@ -23,6 +23,10 @@ export interface BlobSyncPeerBlobState {
   downloading: boolean;
   overSize: boolean;
   errorMessage?: string | null;
+  /**
+   * Upload progress between 0 and 1 while uploading, if the remote storage reports it.
+   */
+  uploadProgress?: number | null;
 }
 
 export class BlobSyncPeer {
@@ -199,7 +203,14 @@ export class BlobSyncPeer {
       await this.blobSync.setBlobUploadedAt(this.peerId, blob.key, null);
       try {
         throwIfAborted(signal);
-        await this.remote.set(blob, signal);
+        await this.remote.set(blob, signal, {
+          onProgress: (uploadedBytes, totalBytes) => {
+            this.status.blobUploadProgress(
+              blob.key,
+              totalBytes > 0 ? uploadedBytes / totalBytes : 1
+            );
+          },
+        });
         await this.blobSync.setBlobUploadedAt(
           this.peerId,
           blob.key,
@@ -403,6 +414,7 @@ class BlobSyncPeerStatus {
   willDownload = new Set<string>();
   error = new Map<string, string>();
   overSize = new Set<string>();
+  uploadProgress = new Map<string, number>();
 
   peerState$ = new Observable<BlobSyncPeerState>(subscribe => {
     const next = () => {
@@ -437,6 +449,7 @@ class BlobSyncPeerStatus {
             this.willDownload.has(blobId) || this.downloading.has(blobId),
           errorMessage: this.error.get(blobId) ?? null,
           overSize: this.overSize.has(blobId),
+          uploadProgress: this.uploadProgress.get(blobId) ?? null,
         });
       };
       next();
@@ -480,6 +493,17 @@ class BlobSyncPeerStatus {
     }
   }
 
+  blobUploadProgress(blobId: string, progress: number) {
+    if (!this.uploading.has(blobId)) {
+      return;
+    }
+    const value = Math.max(0, Math.min(1, progress));
+    if (this.uploadProgress.get(blobId) !== value) {
+      this.uploadProgress.set(blobId, value);
+      this.statusUpdatedSubject$.next(blobId);
+    }
+  }
+
   blobUploadSuccess(blobId: string) {
     this.blobUploadFinish(blobId);
     this.blobErrorFree(blobId);
@@ -491,6 +515,7 @@ class BlobSyncPeerStatus {
 
   blobUploadFinish(blobId: string) {
     let deleted = false;
+    deleted = this.uploadProgress.delete(blobId) || deleted;
     deleted = this.uploading.delete(blobId) || deleted;
     deleted = this.willUpload.delete(blobId) || deleted;
     if (deleted) {
@@ -600,6 +625,7 @@ class BlobSyncPeerStatus {
     deleted = this.downloading.delete(blobId) || deleted;
     deleted = this.error.delete(blobId) || deleted;
     deleted = this.overSize.delete(blobId) || deleted;
+    deleted = this.uploadProgress.delete(blobId) || deleted;
     if (deleted) {
       this.statusUpdatedSubject$.next(blobId);
     }

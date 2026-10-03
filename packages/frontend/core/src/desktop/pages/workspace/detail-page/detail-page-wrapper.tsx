@@ -73,6 +73,9 @@ export const DetailPageWrapper = ({
   pageId: string;
   skeleton: ReactNode;
   notFound: ReactNode;
+  /**
+   * `false` shows `notFound`, `true` or `undefined` (pending) renders the doc.
+   */
   canAccess?: boolean;
 }>) => {
   const { doc, editor, docListReady } = useLoadDoc(pageId);
@@ -81,10 +84,16 @@ export const DetailPageWrapper = ({
     return notFound;
   }
 
-  if (canAccess === undefined || !doc || !editor) {
-    return skeleton;
-  } else if (!canAccess) {
+  // `canAccess === undefined` means the permission check is still pending and
+  // nothing is known about this doc yet. We render the doc anyway so opening a
+  // doc never waits on the network; the page content must stay read-only until
+  // `Doc_Update` is confirmed (see `useGuard('Doc_Update')` in the page impl).
+  if (canAccess === false) {
     return notFound;
+  }
+
+  if (!doc || !editor) {
+    return skeleton;
   }
 
   return (

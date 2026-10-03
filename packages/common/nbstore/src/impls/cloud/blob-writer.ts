@@ -20,6 +20,13 @@ import {
 import type { HttpConnection } from './http';
 
 const UPLOAD_REQUEST_TIMEOUT = 0;
+// number of multipart parts uploaded at the same time
+const MULTIPART_UPLOAD_CONCURRENCY = 4;
+
+type UploadProgressCallback = (
+  uploadedBytes: number,
+  totalBytes: number
+) => void;
 
 function toStrictArrayBuffer(
   data: ArrayBuffer | ArrayBufferLike | ArrayBufferView
@@ -62,7 +69,19 @@ export class CloudBlobWriter {
     private readonly serverBaseUrl: string
   ) {}
 
-  async set(blob: BlobRecord, signal?: AbortSignal) {
+  async set(
+    blob: BlobRecord,
+    signal?: AbortSignal,
+    onProgress?: UploadProgressCallback
+  ) {
+    const totalBytes = blob.data.byteLength;
+    const reportProgress = (uploadedBytes: number) => {
+      try {
+        onProgress?.(Math.min(uploadedBytes, totalBytes), totalBytes);
+      } catch (error) {
+        console.error('blob upload progress callback failed', error);
+      }
+    };
     try {
       signal?.throwIfAborted();
       const blobSizeLimit = await this.getBlobSizeLimit(signal);
@@ -83,8 +102,10 @@ export class CloudBlobWriter {
 
       const upload = init.createBlobUpload;
       if (upload.alreadyUploaded) {
+        reportProgress(totalBytes);
         return;
       }
+      reportProgress(0);
       try {
         if (upload.method === BlobUploadMethod.PRESIGNED) {
           if (!upload.uploadUrl) {
@@ -97,6 +118,7 @@ export class CloudBlobWriter {
             signal
           );
           await this.completeUpload(blob.key, undefined, undefined, signal);
+          reportProgress(totalBytes);
           return;
         }
 
@@ -112,9 +134,11 @@ export class CloudBlobWriter {
             upload.partSize,
             blob.data,
             upload.uploadedParts,
-            signal
+            signal,
+            reportProgress
           );
           await this.completeUpload(blob.key, upload.uploadId, parts, signal);
+          reportProgress(totalBytes);
           return;
         }
       } catch (error) {
@@ -127,7 +151,9 @@ export class CloudBlobWriter {
         }
       }
 
+      reportProgress(0);
       await this.uploadViaGraphql(blob, signal);
+      reportProgress(totalBytes);
     } catch (err) {
       const userFriendlyError = UserFriendlyError.fromAny(err);
       if (userFriendlyError.is('STORAGE_QUOTA_EXCEEDED')) {
@@ -208,23 +234,34 @@ export class CloudBlobWriter {
     partSize: number,
     data: Uint8Array,
     uploadedParts: { partNumber: number; etag: string }[] | null | undefined,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    reportProgress?: (uploadedBytes: number) => void
   ) {
     const partsMap = new Map<number, string>();
     for (const part of uploadedParts ?? []) {
       partsMap.set(part.partNumber, part.etag);
     }
     const totalParts = Math.ceil(data.byteLength / partSize);
+    const getPartRange = (partNumber: number) => {
+      const start = (partNumber - 1) * partSize;
+      return [start, Math.min(start + partSize, data.byteLength)] as const;
+    };
 
+    const pendingParts: number[] = [];
+    let uploadedBytes = 0;
     for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
       if (partsMap.has(partNumber)) {
-        continue;
+        const [start, end] = getPartRange(partNumber);
+        uploadedBytes += end - start;
+      } else {
+        pendingParts.push(partNumber);
       }
-      const start = (partNumber - 1) * partSize;
-      const chunk = data.subarray(
-        start,
-        Math.min(start + partSize, data.byteLength)
-      );
+    }
+    reportProgress?.(uploadedBytes);
+
+    const uploadPart = async (partNumber: number) => {
+      const [start, end] = getPartRange(partNumber);
+      const chunk = data.subarray(start, end);
       const part = await this.connection.gql({
         query: getBlobUploadPartUrlQuery,
         variables: {
@@ -235,6 +272,7 @@ export class CloudBlobWriter {
         },
         context: { signal },
       });
+      signal?.throwIfAborted();
       const res = await this.fetchUpload(
         part.workspace.blobUploadPartUrl.uploadUrl,
         {
@@ -254,6 +292,40 @@ export class CloudBlobWriter {
         throw new Error(`Missing ETag for part ${partNumber}.`);
       }
       partsMap.set(partNumber, etag);
+      uploadedBytes += end - start;
+      reportProgress?.(uploadedBytes);
+    };
+
+    let firstError: unknown = null;
+    let failed = false;
+    let nextIndex = 0;
+    const worker = async () => {
+      while (!failed && nextIndex < pendingParts.length) {
+        const partNumber = pendingParts[nextIndex];
+        nextIndex += 1;
+        try {
+          await uploadPart(partNumber);
+        } catch (error) {
+          // stop picking new parts, the parts already in flight finish on their own
+          if (!failed) {
+            failed = true;
+            firstError = error;
+          }
+          return;
+        }
+      }
+    };
+
+    // wait for every in-flight part to settle before reporting the failure,
+    // so the caller never aborts the multipart upload while parts are still running
+    await Promise.all(
+      Array.from(
+        { length: Math.min(MULTIPART_UPLOAD_CONCURRENCY, pendingParts.length) },
+        () => worker()
+      )
+    );
+    if (failed) {
+      throw firstError;
     }
 
     if (partsMap.size !== totalParts) {

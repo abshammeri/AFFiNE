@@ -47,6 +47,20 @@ describe('AppSidebar', () => {
     expect(sidebar.resizing$.value).toBe(true);
   });
 
+  test('dragging width is kept in memory until persisted', () => {
+    sidebar.setDraggingWidth(300);
+    expect(sidebar.width$.value).toBe(300);
+    expect(memento.get('width')).toBeUndefined();
+
+    sidebar.setDraggingWidth(320);
+    expect(sidebar.width$.value).toBe(320);
+    expect(memento.get('width')).toBeUndefined();
+
+    sidebar.setWidth(320);
+    expect(sidebar.width$.value).toBe(320);
+    expect(memento.get('width')).toBe(320);
+  });
+
   test('getCachedAppSidebarOpenState', () => {
     sidebar.setOpen(false);
     expect(sidebar.getCachedAppSidebarOpenState()).toBe(false);

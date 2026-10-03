@@ -35,10 +35,15 @@ export class CMDKQuickSearchService extends Service {
           this.framework.createEntity(LinksQuickSearchSession),
           this.framework.createEntity(TagsQuickSearchSession),
         ],
-        result => {
+        (result, submitOptions) => {
           if (!result) {
             return;
           }
+
+          // Cmd/Ctrl+Enter (or Cmd/Ctrl+Click) opens docs in a new tab
+          const openOptions = submitOptions?.newTab
+            ? ({ at: 'new-tab' } as const)
+            : undefined;
 
           if (result.source === 'commands') {
             result.payload.run()?.catch(err => {
@@ -49,12 +54,15 @@ export class CMDKQuickSearchService extends Service {
 
           if (result.source === 'link') {
             const { docId, blockIds, elementIds, mode } = result.payload;
-            this.workbenchService.workbench.openDoc({
-              docId,
-              blockIds,
-              elementIds,
-              mode,
-            });
+            this.workbenchService.workbench.openDoc(
+              {
+                docId,
+                blockIds,
+                elementIds,
+                mode,
+              },
+              openOptions
+            );
             return;
           }
 
@@ -80,7 +88,7 @@ export class CMDKQuickSearchService extends Service {
               options.blockIds = [doc.blockId];
             }
 
-            this.workbenchService.workbench.openDoc(options);
+            this.workbenchService.workbench.openDoc(options, openOptions);
             return;
           }
 

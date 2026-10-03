@@ -116,6 +116,29 @@ export class GuardService extends Service {
     return permissions[action as keyof typeof permissions] ?? false;
   }
 
+  /**
+   * Last known result of `Doc_Read` for the doc (from this session or a previous one),
+   * used to render a doc instantly while the real permission check is pending.
+   *
+   * It is only a hint for *read* access, never use it to grant write access.
+   */
+  cachedCanReadDoc(docId: string): boolean | undefined {
+    if (this.isAdmin$.value === true) {
+      return true;
+    }
+    const known = this.docPermissions$.value[docId]?.Doc_Read;
+    if (typeof known === 'boolean') {
+      return known;
+    }
+    if (
+      this.workspaceService.workspace.flavour === 'local' ||
+      this.workspaceService.workspace.openOptions.isSharedMode
+    ) {
+      return undefined;
+    }
+    return this.guardStore.getCachedDocReadPermission(docId);
+  }
+
   revalidateCan<T extends WorkspacePermissionActions | DocPermissionActions>(
     _action: T,
     ...args: T extends DocPermissionActions ? [string] : []
@@ -184,6 +207,10 @@ export class GuardService extends Service {
       return {};
     }
     const permissions = await this.guardStore.getDocPermissions(docId);
+    this.guardStore.setCachedDocReadPermission(
+      docId,
+      permissions.Doc_Read ?? false
+    );
     this.docPermissions$.next({
       ...this.docPermissions$.value,
       [docId]: permissions,

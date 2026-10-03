@@ -6,6 +6,7 @@ import { useCallback, useMemo } from 'react';
 import { QuickSearchService } from '../services/quick-search';
 import type { QuickSearchGroup } from '../types/group';
 import type { QuickSearchItem } from '../types/item';
+import type { QuickSearchSubmitOptions } from '../types/options';
 import { CMDK } from './cmdk';
 import { QuickSearchModal } from './modal';
 
@@ -70,8 +71,8 @@ export const QuickSearchContainer = () => {
   );
 
   const handleSubmit = useCallback(
-    (item: QuickSearchItem) => {
-      quickSearch.submit(item);
+    (item: QuickSearchItem, submitOptions?: QuickSearchSubmitOptions) => {
+      quickSearch.submit(item, submitOptions);
     },
     [quickSearch]
   );

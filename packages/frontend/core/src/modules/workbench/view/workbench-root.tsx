@@ -1,6 +1,9 @@
 import { ResizePanel } from '@affine/component/resize-panel';
 import { AffineErrorComponent } from '@affine/core/components/affine/affine-error-boundary/affine-error-fallback';
-import { workbenchRoutes } from '@affine/core/desktop/workbench-router';
+import {
+  prefetchWorkbenchRoutes,
+  workbenchRoutes,
+} from '@affine/core/desktop/workbench-router';
 import {
   appSettingAtom,
   FrameworkScope,
@@ -61,6 +64,9 @@ export const WorkbenchRoot = memo(() => {
   useEffect(() => {
     workbench.updateBasename(basename);
   }, [basename, workbench]);
+
+  // warm up the code of the other pages, so switching to them does not wait for a chunk download
+  useEffect(() => prefetchWorkbenchRoutes(), []);
 
   return (
     <ViewIslandRegistryProvider>

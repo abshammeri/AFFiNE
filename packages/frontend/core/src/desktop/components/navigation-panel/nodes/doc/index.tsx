@@ -27,7 +27,13 @@ import {
   useService,
   useServices,
 } from '@toeverything/infra';
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { NEVER } from 'rxjs';
 
 import {
@@ -35,6 +41,11 @@ import {
   type NavigationPanelTreeNodeDropEffect,
 } from '../../tree';
 import type { GenericNavigationPanelNode } from '../types';
+import {
+  docChildrenCacheKey,
+  getCachedDocChildren,
+  setCachedDocChildren,
+} from './children-cache';
 import { Empty } from './empty';
 import { useNavigationPanelDocNodeOperations } from './operations';
 import * as styles from './styles.css';
@@ -109,7 +120,7 @@ export const NavigationPanelDocNode = ({
     [DocIcon]
   );
 
-  const children = useLiveData(
+  const liveChildren = useLiveData(
     useMemo(
       () =>
         LiveData.from(
@@ -119,9 +130,39 @@ export const NavigationPanelDocNode = ({
       [docsSearchService, docId, isCollapsed]
     )
   );
-  const searching = children === null;
 
   const [referencesLoading, setReferencesLoading] = useState(true);
+
+  // last-known children, rendered immediately while the indexer is answering
+  const childrenCacheKey = docChildrenCacheKey(
+    workspaceService.workspace.id,
+    docId
+  );
+  const cachedChildren = useMemo(
+    () =>
+      isCollapsed
+        ? undefined
+        : getCachedDocChildren(childrenCacheKey)?.map(id => ({ docId: id })),
+    [childrenCacheKey, isCollapsed]
+  );
+  // while the doc is still being indexed, an empty live answer is likely incomplete
+  const liveChildrenUncertain =
+    referencesLoading && !!liveChildren && liveChildren.length === 0;
+  const children: { docId: string }[] | null =
+    liveChildren && !(liveChildrenUncertain && cachedChildren?.length)
+      ? liveChildren
+      : (cachedChildren ?? null);
+  const searching = children === null;
+
+  useEffect(() => {
+    if (!liveChildren || liveChildrenUncertain) {
+      return;
+    }
+    setCachedDocChildren(
+      childrenCacheKey,
+      liveChildren.map(child => child.docId)
+    );
+  }, [childrenCacheKey, liveChildren, liveChildrenUncertain]);
   useLayoutEffect(() => {
     if (collapsed) {
       return;
@@ -287,7 +328,8 @@ export const NavigationPanelDocNode = ({
       active={active}
       postfix={
         referencesLoading &&
-        !isCollapsed && (
+        !isCollapsed &&
+        !cachedChildren && (
           <Tooltip
             content={t['com.affine.rootAppSidebar.docs.references-loading']()}
           >

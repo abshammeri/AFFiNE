@@ -7,7 +7,7 @@ import { AffineErrorBoundary } from '@affine/core/components/affine/affine-error
 // import { PageAIOnboarding } from '@affine/core/components/affine/ai-onboarding';
 import { GlobalPageHistoryModal } from '@affine/core/components/affine/page-history-modal';
 import { CommentSidebar } from '@affine/core/components/comment/sidebar';
-import { useGuard } from '@affine/core/components/guard';
+import { useDocReadAccess, useGuard } from '@affine/core/components/guard';
 import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-app-setting-helper';
 import { useEnableAI } from '@affine/core/components/hooks/affine/use-enable-ai';
 import { useRegisterBlocksuiteEditorCommands } from '@affine/core/components/hooks/affine/use-register-blocksuite-editor-commands';
@@ -468,7 +468,7 @@ export const Component = () => {
   }, [params, recentPages, workspaceId]);
 
   const pageId = params.pageId;
-  const canAccess = useGuard('Doc_Read', pageId ?? '');
+  const canAccess = useDocReadAccess(pageId ?? '');
 
   return pageId ? (
     <DetailPageWrapper

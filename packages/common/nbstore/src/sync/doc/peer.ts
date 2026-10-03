@@ -817,13 +817,6 @@ export class DocSyncPeer {
       }
       this.statusUpdatedSubject$.next(true);
 
-      for (const [id, v] of Object.entries(newClocks)) {
-        await this.syncMetadata.setPeerRemoteClock(this.peerId, {
-          docId: id,
-          timestamp: v,
-        });
-      }
-
       // add all docs from remote
       for (const docId of this.status.remoteClocks.keys()) {
         this.actions.addDoc(docId);
@@ -833,6 +826,19 @@ export class DocSyncPeer {
           this.actions.addDoc(docId);
         }
       }
+
+      // Persist the new remote clocks in the background instead of blocking
+      // the job loop on one storage write per changed doc, so the prioritized
+      // (currently opened) doc starts pulling right away on cold start.
+      // The persisted clocks are only used as the lower bound for the next
+      // incremental `getDocTimestamps` call and `setPeerRemoteClock` only ever
+      // moves a clock forward, so writing them a bit later is safe: an
+      // interrupted write just makes the next fetch return a superset.
+      this.persistRemoteClocks(newClocks, abort.signal).catch(error => {
+        if (!abort.signal.aborted) {
+          console.warn('Failed to persist remote doc clocks', error);
+        }
+      });
 
       // begin to process jobs
 
@@ -919,6 +925,23 @@ export class DocSyncPeer {
       }
       this.status.syncing = false;
       console.info('Remote sync ended');
+    }
+  }
+
+  private async persistRemoteClocks(
+    clocks: Record<string, Date>,
+    signal: AbortSignal
+  ) {
+    // write one by one, so jobs touching the same table (e.g. the pull of the
+    // opened doc) only ever wait for a single pending write
+    for (const [docId, timestamp] of Object.entries(clocks)) {
+      if (signal.aborted) {
+        return;
+      }
+      await this.syncMetadata.setPeerRemoteClock(this.peerId, {
+        docId,
+        timestamp,
+      });
     }
   }
 
