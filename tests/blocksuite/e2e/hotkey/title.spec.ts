@@ -39,5 +39,5 @@ test('enter in title should move cursor in new paragraph block', async ({
   await assertTitle(page, 'hello');
   await pressEnter(page);
   await type(page, 'world');
-  await assertRichTexts(page, ['world', '']);
+  await assertRichTexts(page, ['world']);
 });

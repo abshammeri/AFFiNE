@@ -74,7 +74,8 @@ test('init paragraph by page title enter at last', async ({ page }) => {
   await type(page, 'world');
 
   await assertTitle(page, 'hello');
-  await assertRichTexts(page, ['world', '']);
+  // the existing empty first paragraph is reused
+  await assertRichTexts(page, ['world']);
 
   //#region Fixes: https://github.com/toeverything/blocksuite/issues/1007
   test.info().annotations.push({
@@ -84,7 +85,7 @@ test('init paragraph by page title enter at last', async ({ page }) => {
   await page.keyboard.press('ArrowLeft');
   await focusTitle(page);
   await pressEnter(page);
-  await assertRichTexts(page, ['', 'world', '']);
+  await assertRichTexts(page, ['', 'world']);
   //#endregion
 });
 
@@ -797,7 +798,7 @@ test('get focus from page title enter', async ({ page }) => {
 
   await pressEnter(page);
   await type(page, 'world');
-  await assertRichTexts(page, ['world', '']);
+  await assertRichTexts(page, ['world']);
 });
 
 test('handling keyup when cursor located in first paragraph', async ({
@@ -811,7 +812,7 @@ test('handling keyup when cursor located in first paragraph', async ({
 
   await pressEnter(page);
   await type(page, 'world');
-  await assertRichTexts(page, ['world', '']);
+  await assertRichTexts(page, ['world']);
   await pressArrowUp(page);
   await waitNextFrame(page);
   await pressArrowUp(page);
@@ -855,7 +856,7 @@ test('press tab in paragraph children', async ({ page }) => {
   await page.keyboard.press('ArrowUp', { delay: 50 });
   await page.keyboard.press('ArrowLeft', { delay: 50 });
   await type(page, '- ');
-  await assertRichTexts(page, ['1', '2', '3', '']);
+  await assertRichTexts(page, ['1', '2', '3']);
 });
 
 test('press left in first paragraph start should not change cursor position', async ({

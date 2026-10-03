@@ -30,6 +30,49 @@ export class EditorMenuButton extends WithDisposable(LitElement) {
 
   private _popper: ReturnType<typeof createButtonPopper> | null = null;
 
+  /**
+   * Move the focus between the menu actions with ArrowUp/ArrowDown,
+   * and trigger the focused action with Enter.
+   */
+  private _handleMenuNavigation(e: KeyboardEvent) {
+    if (this._popper?.state !== 'show') return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+
+    const actions = Array.from(
+      this.querySelectorAll('editor-menu-action')
+    ).filter(
+      action =>
+        !action.hasAttribute('disabled') &&
+        action.closest('editor-menu-button') === this
+    );
+    if (actions.length === 0) return;
+
+    const target = e.target as Element | null;
+    const current = target?.closest('editor-menu-action') ?? null;
+
+    if (e.key === 'Enter' && current && actions.includes(current)) {
+      e.preventDefault();
+      current.click();
+      return;
+    }
+
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    const index = current ? actions.indexOf(current) : -1;
+    const nextIndex =
+      index === -1
+        ? step === 1
+          ? 0
+          : actions.length - 1
+        : (index + step + actions.length) % actions.length;
+    const next = actions[nextIndex];
+    next.tabIndex = -1;
+    next.focus();
+    next.scrollIntoView({ block: 'nearest' });
+  }
+
   private _updatePopper() {
     this._popper?.dispose();
     this._popper = createButtonPopper({
@@ -76,7 +119,9 @@ export class EditorMenuButton extends WithDisposable(LitElement) {
       e.stopPropagation();
       if (e.key === 'Escape') {
         this._popper?.hide();
+        return;
       }
+      this._handleMenuNavigation(e);
     });
     this._disposables.addFromEvent(this._trigger, 'click', (_: MouseEvent) => {
       this._popper?.toggle();
@@ -200,8 +245,13 @@ export class EditorMenuAction extends LitElement {
     }
 
     :host(:hover),
+    :host(:focus-visible),
     :host([data-selected]) {
       background-color: var(--affine-hover-color);
+    }
+
+    :host(:focus-visible) {
+      outline: none;
     }
 
     :host([data-selected]) {
