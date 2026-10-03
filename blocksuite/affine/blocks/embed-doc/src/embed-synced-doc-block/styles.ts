@@ -174,6 +174,7 @@ export const blockStyles = css`
   .affine-embed-synced-doc-editor .affine-page-root-block-container {
     width: 100%;
     max-width: 100%;
+    --affine-editor-bottom-padding: 32px;
   }
 
   @container (max-width: 640px) {

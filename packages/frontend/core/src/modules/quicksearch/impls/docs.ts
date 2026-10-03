@@ -98,8 +98,8 @@ export class DocsQuickSearchSession
     tap(query => {
       this.lastQuery = query;
     }),
-    throttleTime<string>(500, undefined, {
-      leading: false,
+    throttleTime<string>(150, undefined, {
+      leading: true,
       trailing: true,
     }),
     switchMap((query: string) => {
@@ -166,7 +166,8 @@ export class DocsQuickSearchSession
                         : 'com.affine.quicksearch.group.searchfor',
                       options: { query: truncate(query) },
                     },
-                    score: 5,
+                    // rank matching docs above commands, collections and tags
+                    score: 12,
                   },
                   label: {
                     title: title,

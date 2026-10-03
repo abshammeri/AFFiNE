@@ -49,6 +49,7 @@ import * as styles from './node.css';
 import type { NodeOperation } from './types';
 
 const EMPTY_OPERATIONS: NodeOperation[] = [];
+const INDENT_PER_LEVEL = 16;
 
 export type NavigationPanelTreeNodeDropEffectData = {
   source: { data: AffineDNDData['draggable'] };
@@ -257,7 +258,7 @@ export const NavigationPanelTreeNode = ({
       data: dndData?.dropTarget,
       treeInstruction: {
         currentLevel: level,
-        indentPerLevel: 20,
+        indentPerLevel: INDENT_PER_LEVEL,
         mode: !collapsed
           ? 'expanded'
           : lastInGroup
@@ -309,7 +310,7 @@ export const NavigationPanelTreeNode = ({
       // auto expand when dragged over
       const timeout = setTimeout(() => {
         setCollapsed(false);
-      }, 1000);
+      }, 500);
       return () => clearTimeout(timeout);
     }
     return;
@@ -513,7 +514,7 @@ export const NavigationPanelTreeNode = ({
       open={!collapsed}
       onOpenChange={setCollapsed}
       style={assignInlineVars({
-        [styles.levelIndent]: `${level * 20}px`,
+        [styles.levelIndent]: `${level * INDENT_PER_LEVEL}px`,
       })}
       ref={rootRef}
       {...otherProps}
@@ -566,7 +567,10 @@ export const NavigationPanelTreeNode = ({
             )}
         </div>
       </ContextMenu>
-      <Collapsible.Content style={{ display: dragging ? 'none' : undefined }}>
+      <Collapsible.Content
+        className={styles.collapsibleContent}
+        style={{ display: dragging ? 'none' : undefined }}
+      >
         {/* For lastInGroup check, the placeholder must be placed above all children in the dom */}
         <div className={styles.collapseContentPlaceholder}>
           {childCount === 0 && !collapsed ? childrenPlaceholder : null}

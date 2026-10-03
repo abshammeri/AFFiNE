@@ -167,7 +167,7 @@ const ResizeHandle = ({
   );
 };
 
-const animationTimeout = 300;
+const animationTimeout = 200;
 
 export const ResizePanel = forwardRef<HTMLDivElement, ResizePanelProps>(
   function ResizePanel(

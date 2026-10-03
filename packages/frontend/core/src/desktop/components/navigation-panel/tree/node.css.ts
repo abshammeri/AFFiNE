@@ -12,7 +12,7 @@ export const itemRoot = style({
   textAlign: 'left',
   color: 'inherit',
   width: '100%',
-  minHeight: '30px',
+  minHeight: '28px',
   userSelect: 'none',
   cursor: 'pointer',
   padding: '0 6px',
@@ -50,7 +50,7 @@ export const toggleIcon = style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  marginRight: 12,
+  marginRight: 8,
 });
 export const itemRenameAnchor = style({
   pointerEvents: 'none',
@@ -68,6 +68,13 @@ export const itemContent = style({
   flex: 1,
   color: cssVarV2('text/primary'),
   lineHeight: cssVar('lineHeight'),
+  selectors: {
+    // fade the title under the hover actions instead of re-flowing it
+    [`${itemRoot}:hover &`]: {
+      maskImage:
+        'linear-gradient(to right, black calc(100% - 64px), transparent calc(100% - 44px))',
+    },
+  },
 });
 export const postfix = style({
   display: 'flex',
@@ -80,7 +87,6 @@ export const postfix = style({
     [`${itemRoot}:hover &`]: {
       opacity: 1,
       pointerEvents: 'initial',
-      position: 'initial',
     },
   },
 });
@@ -135,6 +141,19 @@ export const collapsedIcon = style({
   selectors: {
     '&[data-collapsed="true"]': {
       transform: 'rotate(-90deg)',
+    },
+  },
+});
+
+const expandIn = keyframes({
+  from: { opacity: 0, transform: 'translateY(-2px)' },
+  to: { opacity: 1, transform: 'translateY(0)' },
+});
+
+export const collapsibleContent = style({
+  selectors: {
+    '&[data-state="open"]': {
+      animation: `${expandIn} 150ms ease-out`,
     },
   },
 });

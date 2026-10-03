@@ -160,7 +160,10 @@ export class ParagraphBlockComponent extends CaptionedBlockComponent<ParagraphBl
         }
         const textSelection = this.host.selection.find(TextSelection);
         const isCollapsed = textSelection?.isCollapsed() ?? false;
-        if (!this.focused$.value || !isCollapsed) {
+        const focused = this.focused$.value;
+        // empty headings keep their placeholder even when not focused
+        const isHeading = this.model.props.type$.value.startsWith('h');
+        if (focused ? !isCollapsed : !isHeading) {
           this._displayPlaceholder.value = false;
           return;
         }
