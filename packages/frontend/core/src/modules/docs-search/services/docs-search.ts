@@ -251,6 +251,40 @@ export class DocsSearchService extends Service {
     );
   }
 
+  /**
+   * ids of every doc that is linked from some other doc
+   */
+  watchLinkedDocIds() {
+    return this.indexer
+      .search$(
+        'block',
+        { type: 'exists', field: 'refDocId' },
+        {
+          fields: ['docId', 'ref'],
+          pagination: {
+            limit: Infinity,
+          },
+        }
+      )
+      .pipe(
+        map(({ nodes }) => {
+          const linked = new Set<string>();
+          for (const node of nodes) {
+            const sourceId = stringField(node.fields.docId);
+            for (const ref of parseIndexedReferences(node.fields.ref).refs) {
+              if (ref.docId !== sourceId) linked.add(ref.docId);
+            }
+          }
+          return linked;
+        }),
+        distinctUntilChanged(
+          (previous, current) =>
+            previous.size === current.size &&
+            Array.from(current).every(id => previous.has(id))
+        )
+      );
+  }
+
   watchRefsBySourceFrom(ids: string | string[]) {
     const docIds = Array.isArray(ids) ? ids : [ids];
     if (docIds.length === 0) {

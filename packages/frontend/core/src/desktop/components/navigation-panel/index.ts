@@ -1,5 +1,6 @@
 export { CollapsibleSection } from './layouts/collapsible-section';
 export { NavigationPanelCollections } from './sections/collections';
+export { NavigationPanelDocs } from './sections/docs';
 export { NavigationPanelFavorites } from './sections/favorites';
 export { NavigationPanelMigrationFavorites } from './sections/migration-favorites';
 export { NavigationPanelOrganize } from './sections/organize';
