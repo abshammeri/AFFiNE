@@ -66,6 +66,9 @@ export interface AffineDNDData extends DNDData {
           at: 'navigation-panel:tags:docs';
         }
       | {
+          at: 'navigation-panel:docs:list';
+        }
+      | {
           at: 'app-header:tabs';
           tabId: string;
         }
