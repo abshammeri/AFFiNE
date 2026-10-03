@@ -118,14 +118,17 @@ export const startDragWidthAdjustmentBar = (
         getResultInRange((x - left) / scale, column.minWidth, Infinity)
       );
       preview.display(left, rect.top, rect.bottom - rect.top, width * scale);
+      column.updateWidthDraft(width);
       return {
         width,
       };
     },
     onDrop: ({ width }) => {
+      column.updateWidthDraft(undefined);
       column.updateWidth(width);
     },
     onClear: () => {
+      column.updateWidthDraft(undefined);
       preview.remove();
     },
   });

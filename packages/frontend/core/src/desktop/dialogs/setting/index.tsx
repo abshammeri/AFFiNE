@@ -278,8 +278,8 @@ export const SettingDialog = ({
 }: DialogComponentProps<WORKSPACE_DIALOG_SCHEMA['setting']>) => {
   return (
     <Modal
-      width={1280}
-      height={920}
+      width={1100}
+      height={720}
       contentOptions={{
         ['data-testid' as string]: 'setting-modal',
         style: {
