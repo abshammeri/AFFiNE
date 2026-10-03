@@ -86,6 +86,27 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
     return this.doc.getBlock(noteId)?.model as NoteBlockModel;
   }
 
+  /**
+   * Whether the caret is on the last visual line of the title,
+   * falls back to true when it can not be measured
+   */
+  private _isCaretOnLastLine() {
+    const selection = document.getSelection();
+    const container = this.inlineEditorContainer;
+    if (!selection || selection.rangeCount === 0 || !container) return true;
+
+    const range = selection.getRangeAt(0);
+    const rects = range.getClientRects();
+    const caretRect =
+      rects.length > 0
+        ? rects[rects.length - 1]
+        : range.getBoundingClientRect();
+    if (caretRect.height === 0) return true;
+
+    const containerRect = container.getBoundingClientRect();
+    return caretRect.bottom + caretRect.height / 2 > containerRect.bottom;
+  }
+
   private readonly _onTitleKeyDown = (event: KeyboardEvent) => {
     if (event.isComposing || this.doc.readonly) return;
     if (!this._std) return;
@@ -97,16 +118,36 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
 
       const inlineRange = this.inlineEditor?.getInlineRange();
       if (inlineRange) {
+        const note = this._getOrCreateFirstPageVisibleNote();
+        const firstBlock = note.children[0];
+        const isCaretAtEnd =
+          inlineRange.length === 0 &&
+          inlineRange.index >= (this._rootModel?.props.title.length ?? 0);
+        if (
+          isCaretAtEnd &&
+          firstBlock &&
+          matchModels(firstBlock, [ParagraphBlockModel]) &&
+          firstBlock.props.type === 'text' &&
+          firstBlock.props.text.length === 0
+        ) {
+          // Reuse the existing empty first paragraph
+          focusTextModel(this._std, firstBlock.id);
+          return;
+        }
+
         const rightText = this._rootModel?.props.title.split(inlineRange.index);
         const newFirstParagraphId = this.doc.addBlock(
           'affine:paragraph',
           { text: rightText },
-          this._getOrCreateFirstPageVisibleNote(),
+          note,
           0
         );
         if (this._std) focusTextModel(this._std, newFirstParagraphId);
       }
     } else if (event.key === 'ArrowDown') {
+      // Let the caret move inside a multi-line title natively
+      if (!this._isCaretOnLastLine()) return;
+
       this._std.event.active = true;
       event.preventDefault();
       event.stopPropagation();

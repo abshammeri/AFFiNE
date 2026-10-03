@@ -34,6 +34,16 @@ export const linkedDocPopoverStyles = css`
     box-shadow: ${unsafeCSSVar('overlayPanelShadow')};
     border-radius: 4px;
     z-index: var(--affine-z-index-popover);
+    animation: linked-doc-popover-fade-in 120ms ease-out;
+  }
+
+  @keyframes linked-doc-popover-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .linked-doc-popover icon-button {

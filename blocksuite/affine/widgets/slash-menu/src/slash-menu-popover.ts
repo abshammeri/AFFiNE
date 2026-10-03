@@ -30,6 +30,7 @@ import throttle from 'lodash-es/throttle';
 
 import {
   AFFINE_SLASH_MENU_MAX_HEIGHT,
+  AFFINE_SLASH_MENU_NO_RESULT_TOLERANCE,
   AFFINE_SLASH_MENU_TOOLTIP_TIMEOUT,
   AFFINE_SLASH_MENU_TRIGGER_KEY,
 } from './consts.js';
@@ -55,12 +56,26 @@ const isTextInputKey = (e: KeyboardEvent) => {
   if (e.isComposing) return false;
 
   // Only allow single-character keys as text input
-  if (e.key.length !== 1) return false;
+  return e.key.length === 1;
+};
 
-  // Keep existing behavior: space closes the slash menu
-  if (e.key === ' ') return false;
-
-  return true;
+/**
+ * Rank how well an item matches the query, higher is better:
+ * exact match > prefix match > word-start match > substring match.
+ */
+const slashItemMatchRank = (
+  { name, searchAlias = [] }: SlashMenuItem,
+  query: string
+) => {
+  let rank = 0;
+  for (const str of [name, ...searchAlias]) {
+    const target = str.toLowerCase();
+    if (target === query) return 4;
+    if (target.startsWith(query)) rank = Math.max(rank, 3);
+    else if (` ${target}`.includes(` ${query}`)) rank = Math.max(rank, 2);
+    else if (target.includes(query)) rank = Math.max(rank, 1);
+  }
+  return rank;
 };
 type InnerSlashMenuContext = SlashMenuContext & {
   onClickItem: (item: SlashMenuActionItem) => void;
@@ -122,7 +137,18 @@ export class SlashMenu extends WithDisposable(LitElement) {
 
   private readonly _itemPathMap = new Map<SlashMenuItem, number[]>();
 
-  private _queryState: 'off' | 'on' | 'no_result' = 'off';
+  /**
+   * - off: no query, show all items
+   * - on: show the filtered items
+   * - empty: nothing matches, show the "No results" row
+   * - no_result: the menu is hidden temporarily
+   */
+  private _queryState: 'off' | 'on' | 'empty' | 'no_result' = 'off';
+
+  /**
+   * The query length at which the query stopped matching any item
+   */
+  private _noResultQueryLength: number | null = null;
 
   private readonly _startRange = this.inlineEditor.getInlineRange();
 
@@ -133,12 +159,24 @@ export class SlashMenu extends WithDisposable(LitElement) {
       return;
     }
     this._filteredItems = [];
-    const searchStr = query.toLowerCase();
-    if (searchStr === '' || searchStr.endsWith(' ')) {
-      this._queryState = searchStr === '' ? 'off' : 'no_result';
+    if (query === '') {
+      this._queryState = 'off';
+      this._noResultQueryLength = null;
       this._innerSlashMenuContext.searching = false;
       return;
     }
+    if (/^\s/.test(query)) {
+      // A space right after the slash hides the menu,
+      // pressing backspace immediately brings it back
+      if (query.length > 1) {
+        this.abortController.abort();
+        return;
+      }
+      this._queryState = 'no_result';
+      this._innerSlashMenuContext.searching = false;
+      return;
+    }
+    const searchStr = query.trimEnd().toLowerCase();
 
     // Layer order traversal
     let depth = 0;
@@ -170,14 +208,29 @@ export class SlashMenu extends WithDisposable(LitElement) {
     }
 
     this._filteredItems.sort((a, b) => {
-      return -(
-        substringMatchScore(a.name, searchStr) -
-        substringMatchScore(b.name, searchStr)
+      return (
+        slashItemMatchRank(b, searchStr) - slashItemMatchRank(a, searchStr) ||
+        substringMatchScore(b.name, searchStr) -
+          substringMatchScore(a.name, searchStr)
       );
     });
 
-    this._queryState = this._filteredItems.length === 0 ? 'no_result' : 'on';
     this._innerSlashMenuContext.searching = true;
+    if (this._filteredItems.length !== 0) {
+      this._queryState = 'on';
+      this._noResultQueryLength = null;
+      return;
+    }
+
+    this._noResultQueryLength ??= query.length;
+    if (
+      query.length - this._noResultQueryLength >
+      AFFINE_SLASH_MENU_NO_RESULT_TOLERANCE
+    ) {
+      this.abortController.abort();
+      return;
+    }
+    this._queryState = 'empty';
   };
 
   private get _query() {
@@ -221,11 +274,13 @@ export class SlashMenu extends WithDisposable(LitElement) {
      * Handle arrow key
      *
      * The slash menu will be closed in the following keyboard cases:
-     * - Press the space key
+     * - Press the space key right after the slash
      * - Press the backspace key and the search string is empty
      * - Press the escape key
-     * - When the search item is empty, the slash menu will be hidden temporarily,
-     *   and if the following key is not the backspace key, the slash menu will be closed
+     * - When the search item is empty, a "No results" row is shown,
+     *   and if the following key is not a text input key or the backspace key,
+     *   or the query keeps not matching for several more characters,
+     *   the slash menu will be closed
      */
     createKeydownObserver({
       target: inlineEditor.eventSource,
@@ -243,7 +298,10 @@ export class SlashMenu extends WithDisposable(LitElement) {
           return;
         }
 
-        if (key !== 'Backspace' && this._queryState === 'no_result') {
+        if (
+          key !== 'Backspace' &&
+          (this._queryState === 'no_result' || this._queryState === 'empty')
+        ) {
           if (isTextInputKey(event)) {
             // allow typing to change query; don't abort here
           } else {
@@ -556,6 +614,7 @@ export class InnerSlashMenu extends WithDisposable(LitElement) {
       event => {
         if (this._currentSubMenu) return;
         if (event.isComposing) return;
+        if (this.menu.length === 0) return;
 
         const { key, ctrlKey, metaKey, altKey, shiftKey } = event;
 
@@ -640,7 +699,9 @@ export class InnerSlashMenu extends WithDisposable(LitElement) {
   }
 
   override render() {
-    if (this.menu.length === 0) return nothing;
+    const showNoResult =
+      this.menu.length === 0 && this.depth === 0 && this.context.searching;
+    if (this.menu.length === 0 && !showNoResult) return nothing;
 
     const style = styleMap(this.mainMenuStyle ?? { position: 'relative' });
 
@@ -653,9 +714,13 @@ export class InnerSlashMenu extends WithDisposable(LitElement) {
       style=${style}
       data-testid=${`sub-menu-${this.depth}`}
     >
-      ${Object.entries(groups).map(([groupName, items]) =>
-        this._renderGroup(groupName, items)
-      )}
+      ${
+        showNoResult
+          ? html`<div class="slash-menu-no-result">No results</div>`
+          : Object.entries(groups).map(([groupName, items]) =>
+              this._renderGroup(groupName, items)
+            )
+      }
     </div>`;
   }
 

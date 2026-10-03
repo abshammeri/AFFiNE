@@ -81,7 +81,7 @@ export class AffineLink extends WithDisposable(ShadowlessElement) {
       message$.value = null;
       this._whenHover.setFloating();
     },
-    { enterDelay: 500 }
+    { enterDelay: 300 }
   );
 
   override connectedCallback() {
