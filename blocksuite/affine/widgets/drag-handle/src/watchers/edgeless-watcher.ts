@@ -95,14 +95,15 @@ export class EdgelessWatcher {
     zoom: number;
     center: IVec;
   }) => {
-    if (this.widget.scale.peek() !== zoom) {
+    const zoomChanged = this.widget.scale.peek() !== zoom;
+    if (zoomChanged) {
       this.widget.scale.value = zoom;
     }
 
-    if (
+    const centerChanged =
       this.widget.center[0] !== center[0] ||
-      this.widget.center[1] !== center[1]
-    ) {
+      this.widget.center[1] !== center[1];
+    if (centerChanged) {
       this.widget.center = [...center];
     }
 
@@ -110,7 +111,12 @@ export class EdgelessWatcher {
       const area = this.hoveredElemArea;
       this._showDragHandle(area);
       this._updateDragHoverRectTopLevelBlock(area);
-    } else if (this.widget.activeDragHandle) {
+    } else if (this.widget.activeDragHandle && (zoomChanged || centerChanged)) {
+      // The viewport also emits when a (debounced) resize completes without
+      // moving anything, e.g. the initial ResizeObserver callback right after
+      // the edgeless editor mounts. Only hide the block handle when the
+      // content actually moved, otherwise it disappears under a still pointer
+      // and is not shown again until the next pointer move.
       this.widget.hide();
     }
   };
@@ -164,7 +170,16 @@ export class EdgelessWatcher {
     this._lastAppliedHoveredElemArea = this._cloneArea(area);
   };
 
-  private readonly _showDragHandle = (area?: HoveredElemArea | null) => {
+  /**
+   * @param immediate Apply the handle synchronously instead of in the next
+   * animation frame. Used for discrete changes (e.g. selecting an element) so
+   * the handle is laid out as soon as the selection is, while high-frequency
+   * updates (viewport, element updates) stay batched per frame.
+   */
+  private readonly _showDragHandle = (
+    area?: HoveredElemArea | null,
+    immediate = false
+  ) => {
     const nextArea = area ?? this.hoveredElemArea;
     this._pendingHoveredElemArea = nextArea;
     if (!this._pendingHoveredElemArea) {
@@ -178,6 +193,13 @@ export class EdgelessWatcher {
         this._pendingHoveredElemArea
       )
     ) {
+      return;
+    }
+    if (immediate) {
+      if (this._showDragHandleRafId !== null) {
+        cancelAnimationFrame(this._showDragHandleRafId);
+      }
+      this._flushShowDragHandle();
       return;
     }
     if (this._showDragHandleRafId !== null) {
@@ -247,7 +269,7 @@ export class EdgelessWatcher {
 
     this.widget.anchorBlockId.value = selectedElement.id;
 
-    this._showDragHandle();
+    this._showDragHandle(undefined, true);
   };
 
   get hoveredElemAreaRect() {
@@ -307,6 +329,11 @@ export class EdgelessWatcher {
     const gfx = std.get(GfxControllerIdentifier);
     const { viewport, selection, tool, surface } = gfx;
     const edgelessSlots = std.get(EdgelessLegacySlotIdentifier);
+
+    // Start from the current viewport so the first `viewportUpdated` can tell
+    // whether the viewport really changed.
+    this.widget.scale.value = viewport.zoom;
+    this.widget.center = [viewport.centerX, viewport.centerY];
 
     disposables.add(
       viewport.viewportUpdated.subscribe(this._handleEdgelessViewPortUpdated)
