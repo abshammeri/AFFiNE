@@ -13,10 +13,12 @@ globalStyle('body', {
  * "Source Sans 3", Poppins, apple-system, ...). Serif / mono keep their theme
  * fonts and only gain `ui-sans-serif` as the fallback for Arabic.
  *
- * Note: Chromium (and so Electron) does not implement the `ui-sans-serif`
- * generic yet; it skips it like an unknown family, so there Arabic resolves to
- * the first later family with Arabic glyphs (Tahoma on macOS). WebKit honours
- * it (SF Arabic on Apple platforms).
+ * Arabic resolves as follows:
+ * - WebKit honours `ui-sans-serif` (SF Arabic on Apple platforms).
+ * - Chromium / Electron skip `ui-sans-serif`, so they use the bundled
+ *   "IBM Plex Sans Arabic" (see fonts.css).
+ * - If that font cannot load, Tahoma and Arial are removed from the stacks so
+ *   the browser falls back to the operating system's Arabic font instead.
  *
  * The stacks come from @toeverything/theme; we re-declare the variables on
  * `:root:root` so they win over the theme's `:root` rules (incl. print).
@@ -38,22 +40,29 @@ const withoutSystemAliases = (stack: string) =>
     .map(f => f.trim())
     .filter(f => f !== 'apple-system' && f !== 'BlinkMacSystemFont')
     .join(', ');
+const ARABIC_FALLBACKS = ['ui-sans-serif', "'IBM Plex Sans Arabic'"];
+const withoutArabicLegacyFonts = (stack: string) =>
+  stack
+    .split(',')
+    .map(f => f.trim())
+    .filter(f => f !== 'Tahoma' && f !== 'Arial')
+    .join(', ');
 const withGeist = (stack: string) =>
-  ["'Geist'", 'ui-sans-serif', stack].join(', ');
+  ["'Geist'", ...ARABIC_FALLBACKS, withoutArabicLegacyFonts(stack)].join(', ');
 
 const sansFamily = withGeist(baseTheme.fontSansFamily);
 const fontFamily = withGeist(baseTheme.fontFamily);
 const serifFamily = insertAfterFirstFamily(
-  baseTheme.fontSerifFamily,
+  withoutArabicLegacyFonts(baseTheme.fontSerifFamily),
   'ui-serif',
-  'ui-sans-serif'
+  ...ARABIC_FALLBACKS
 );
-// keep the monospace fonts first, but use ui-sans-serif before the generic
-// system fallbacks for non-Latin text in code
+// keep the monospace fonts first, but use the Arabic fallbacks before the
+// generic system fallbacks for non-Latin text in code
 const monoFamily = insertBefore(
-  baseTheme.fontMonoFamily,
+  withoutArabicLegacyFonts(baseTheme.fontMonoFamily),
   'apple-system',
-  'ui-sans-serif'
+  ...ARABIC_FALLBACKS
 );
 
 globalStyle(':root:root', {
