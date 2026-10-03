@@ -5177,6 +5177,22 @@ export function useAFFiNEI18N(): {
       */
     ["com.affine.rootAppSidebar.collection.new"](): string;
     /**
+      * `Docs`
+      */
+    ["com.affine.rootAppSidebar.docs"](): string;
+    /**
+      * `No docs yet`
+      */
+    ["com.affine.rootAppSidebar.docs.empty"](): string;
+    /**
+      * `Show more`
+      */
+    ["com.affine.rootAppSidebar.docs.show-more"](): string;
+    /**
+      * `Show less`
+      */
+    ["com.affine.rootAppSidebar.docs.show-less"](): string;
+    /**
       * `Others`
       */
     ["com.affine.rootAppSidebar.others"](): string;
