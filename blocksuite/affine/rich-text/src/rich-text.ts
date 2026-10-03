@@ -24,6 +24,8 @@ import { z } from 'zod';
 import { onVBeforeinput, onVCompositionEnd } from './hooks.js';
 import { getPrefixText } from './utils.js';
 
+const CARET_SCROLL_MARGIN = 48;
+
 interface RichTextStackItem {
   meta: Map<'richtext-v-range', InlineRange | null>;
 }
@@ -278,10 +280,19 @@ export class RichText extends WithDisposable(ShadowlessElement) {
                 verticalScrollContainer.getBoundingClientRect();
               const rangeRect = range.getBoundingClientRect();
 
+              // scroll just enough to reveal the caret, with some breathing
+              // room, instead of jumping the whole paragraph into view
               if (rangeRect.top < containerRect.top) {
-                this.scrollIntoView({ block: 'start' });
+                verticalScrollContainer.scrollBy({
+                  top: rangeRect.top - containerRect.top - CARET_SCROLL_MARGIN,
+                });
               } else if (rangeRect.bottom > containerRect.bottom) {
-                this.scrollIntoView({ block: 'end' });
+                verticalScrollContainer.scrollBy({
+                  top:
+                    rangeRect.bottom -
+                    containerRect.bottom +
+                    CARET_SCROLL_MARGIN,
+                });
               }
             }
 

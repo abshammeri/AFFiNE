@@ -274,7 +274,7 @@ class ViewProvider {
             h4: 'Heading 4',
             h5: 'Heading 5',
             h6: 'Heading 6',
-            quote: '',
+            quote: 'Empty quote',
           };
           return placeholders[model.props.type] ?? '';
         },

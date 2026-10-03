@@ -1,6 +1,6 @@
 import { cssVar } from '@toeverything/theme';
 import { cssVarV2 } from '@toeverything/theme/v2';
-import { style } from '@vanilla-extract/css';
+import { keyframes, style } from '@vanilla-extract/css';
 export const pageDetailSkeletonStyle = style({
   padding: '0 20px',
   height: '100%',
@@ -38,21 +38,6 @@ export const content = style({
     },
   },
 });
-export const loadingIcon = style({
-  marginRight: '8px',
-});
-export const title = style({
-  fontSize: cssVar('fontBase'),
-  lineHeight: 1.6,
-  fontWeight: 500,
-  color: cssVarV2('text/primary'),
-  textAlign: 'center',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-  marginBottom: '4px',
-});
 export const text = style({
   fontSize: cssVar('fontSm'),
   lineHeight: 1.6,
@@ -80,4 +65,27 @@ export const actionContent = style({
 });
 export const mobileActionContent = style({
   padding: '0 4px',
+});
+
+const fadeIn = keyframes({
+  from: { opacity: 0 },
+  to: { opacity: 1 },
+});
+export const editorSkeleton = style({
+  width: '100%',
+  maxWidth: 'var(--affine-editor-width, 800px)',
+  margin: '0 auto',
+  padding: '96px 24px 0',
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  opacity: 0,
+  animation: `${fadeIn} 200ms ease-out 150ms forwards`,
+});
+export const skeletonTitle = style({
+  marginBottom: '22px',
+});
+export const skeletonGap = style({
+  height: '12px',
 });

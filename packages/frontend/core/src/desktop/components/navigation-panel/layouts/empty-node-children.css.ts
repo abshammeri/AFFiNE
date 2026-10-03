@@ -15,7 +15,7 @@ export const emptyChildren = style({
   // 48 = node.paddingLeft + node.collapsable.width + node.icon.width + node.icon.marginRight
   //    = 4 + 16 + 20 + 8
   // to align with node's content
-  paddingLeft: `calc(${fallbackVar(levelIndent, '20px')} + 48px)`,
+  paddingLeft: `calc(${fallbackVar(levelIndent, '16px')} + 44px)`,
   selectors: {
     '&[data-dragged-over="true"]': {
       background: cssVarV2('layer/background/hoverOverlay'),

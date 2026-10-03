@@ -37,7 +37,9 @@ export const root = style({
         transform: `translateX(calc(${panelWidthVar} * -1))`,
       },
     '&[data-enable-animation="true"]': {
-      transition: `margin-left ${animationTimeout}, margin-right ${animationTimeout}, transform ${animationTimeout}, background ${animationTimeout}`,
+      transition: ['margin-left', 'margin-right', 'transform', 'background']
+        .map(prop => `${prop} ${animationTimeout} cubic-bezier(0.2, 0, 0, 1)`)
+        .join(', '),
     },
     '&[data-transition-state="exited"]': {
       // avoid focus on hidden panel

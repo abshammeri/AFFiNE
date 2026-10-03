@@ -35,6 +35,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -77,21 +78,32 @@ const TemplateMark = memo(function TemplateMark({
   );
 });
 
+/**
+ * Measure the header before the first paint, so responsive buttons don't pop
+ * in one frame after the doc opens.
+ */
+function useContainerWidth() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    setContainerWidth(container.getBoundingClientRect().width);
+    return observeResize(container, entry => {
+      setContainerWidth(entry.contentRect.width);
+    });
+  }, []);
+
+  return [containerRef, containerWidth] as const;
+}
+
 interface PageHeaderProps {
   page: Store;
   workspace: Workspace;
 }
 export function JournalPageHeader({ page, workspace }: PageHeaderProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    return observeResize(container, entry => {
-      setContainerWidth(entry.contentRect.width);
-    });
-  }, []);
+  const [containerRef, containerWidth] = useContainerWidth();
 
   const { hideShare, hideToday } =
     useDetailPageHeaderResponsive(containerWidth);
@@ -124,16 +136,7 @@ export function JournalPageHeader({ page, workspace }: PageHeaderProps) {
 
 export function NormalPageHeader({ page, workspace }: PageHeaderProps) {
   const titleInputHandleRef = useRef<InlineEditHandle>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    return observeResize(container, entry => {
-      setContainerWidth(entry.contentRect.width);
-    });
-  }, []);
+  const [containerRef, containerWidth] = useContainerWidth();
 
   const { hideCollect, hideShare, hidePresent, showDivider } =
     useDetailPageHeaderResponsive(containerWidth);

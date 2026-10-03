@@ -38,6 +38,7 @@ export type History = {
 const MAX_WIDTH = 480;
 const MIN_WIDTH = 248;
 const isMacosDesktop = BUILD_CONFIG.isElectron && environment.isMacOs;
+const SIDEBAR_PEEK_EDGE_WIDTH = 8;
 
 export function AppSidebar({ children }: PropsWithChildren) {
   const { appSettings } = useAppSettingHelper();
@@ -112,6 +113,22 @@ export function AppSidebar({ children }: PropsWithChildren) {
       document.removeEventListener('mousemove', onMouseMove);
     };
   }, [appSidebarService, resizing, sidebarState, width]);
+
+  // like Notion, peek the closed sidebar when the pointer reaches the left edge
+  useEffect(() => {
+    if (sidebarState !== 'close' || smallScreenMode) {
+      return;
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      if (e.buttons === 0 && e.clientX <= SIDEBAR_PEEK_EDGE_WIDTH) {
+        appSidebarService.setHovering(true);
+      }
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+    };
+  }, [appSidebarService, sidebarState, smallScreenMode]);
 
   const resizeHandleDropTargetOptions = useMemo(() => {
     return () => ({

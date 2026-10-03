@@ -1,6 +1,10 @@
 import { style } from '@vanilla-extract/css';
 export const editor = style({
   flex: 1,
+  vars: {
+    // leave room below the last block so you can keep typing mid-screen
+    '--affine-editor-bottom-padding': '30vh',
+  },
   selectors: {
     '&.full-screen': {
       width: '100%',

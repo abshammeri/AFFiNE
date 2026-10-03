@@ -3,7 +3,7 @@ import { Service } from '@toeverything/infra';
 import type { DocRecord, DocsService } from '../../doc';
 import type { WorkspaceLocalState } from '../../workspace';
 
-const RECENT_PAGES_LIMIT = 3; // adjust this?
+const RECENT_PAGES_LIMIT = 8;
 const RECENT_PAGES_KEY = 'recent-pages';
 
 const EMPTY_ARRAY: string[] = [];
