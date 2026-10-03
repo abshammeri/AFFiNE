@@ -4,8 +4,8 @@ import {
   Menu,
   MenuItem,
   type MenuProps,
-  useConfirmModal,
 } from '@affine/component';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { DocsService } from '@affine/core/modules/doc';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
@@ -145,7 +145,6 @@ const Duplicate = ({ docId }: DocOperationProps) => {
 const MoveToTrash = ({ docId }: DocOperationProps) => {
   const t = useI18n();
   const docsService = useService(DocsService);
-  const { openConfirmModal } = useConfirmModal();
   const doc = useLiveData(docsService.list.doc$(docId));
   const guardService = useService(GuardService);
 
@@ -157,21 +156,8 @@ const MoveToTrash = ({ docId }: DocOperationProps) => {
     }
 
     track.allDocs.list.docMenu.deleteDoc();
-    openConfirmModal({
-      title: t['com.affine.moveToTrash.confirmModal.title'](),
-      description: t['com.affine.moveToTrash.confirmModal.description']({
-        title: doc.title$.value || t['Untitled'](),
-      }),
-      cancelText: t['com.affine.confirmModal.button.cancel'](),
-      confirmText: t.Delete(),
-      confirmButtonOptions: {
-        variant: 'error',
-      },
-      onConfirm: async () => {
-        await doc.moveToTrash();
-      },
-    });
-  }, [doc, openConfirmModal, t]);
+    moveToTrashWithUndo([doc]).catch(console.error);
+  }, [doc]);
 
   return (
     <MenuItem

@@ -27,9 +27,7 @@ test('page delete -> refresh page -> it should be disappear', async ({
   await getPageOperationButton(page, newPageId).click();
   const deleteBtn = page.getByTestId('doc-list-operation-trash');
   await deleteBtn.click();
-  const confirmTip = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
   await page.getByTestId('trash-page').click();
   await page.getByTestId('delete-page-button').click();
   await page.getByText('Delete permanently?').dblclick();
@@ -59,9 +57,7 @@ test('page delete -> create new page -> refresh page -> new page should be appea
   await getPageOperationButton(page, newPageDeleteId).click();
   const deleteBtn = page.getByTestId('doc-list-operation-trash');
   await deleteBtn.click();
-  const confirmTip = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
   await page.getByTestId('trash-page').click();
   await page.getByTestId('delete-page-button').click();
   await page.getByText('Delete permanently?').dblclick();
@@ -116,9 +112,7 @@ test('delete multiple pages -> create multiple pages -> refresh', async ({
   await getPageOperationButton(page, newPageId1).click();
   const deleteBtn1 = page.getByTestId('doc-list-operation-trash');
   await deleteBtn1.click();
-  const confirmTip1 = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip1).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
   await page.getByTestId('trash-page').click();
   await page.getByTestId('delete-page-button').click();
   await page.getByText('Delete permanently?').dblclick();
@@ -131,9 +125,7 @@ test('delete multiple pages -> create multiple pages -> refresh', async ({
   await getPageOperationButton(page, newPageId2).click();
   const deleteBtn2 = page.getByTestId('doc-list-operation-trash');
   await deleteBtn2.click();
-  const confirmTip2 = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip2).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
   await page.getByTestId('trash-page').click();
   await page.getByTestId('delete-page-button').click();
   await page.getByText('Delete permanently?').dblclick();
