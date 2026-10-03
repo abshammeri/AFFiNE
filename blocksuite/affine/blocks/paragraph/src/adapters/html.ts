@@ -335,6 +335,8 @@ export const paragraphBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
         delta: DeltaInsert[];
       };
       const { walkerContext, deltaConverter } = context;
+      const textDirection = o.node.props.textDirection as string | undefined;
+      const dirProps = textDirection ? { dir: textDirection } : {};
       switch (o.node.props.type) {
         case 'text': {
           walkerContext
@@ -344,6 +346,7 @@ export const paragraphBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
                 tagName: 'div',
                 properties: {
                   className: ['affine-paragraph-block-container'],
+                  ...dirProps,
                 },
                 children: [],
               },
@@ -386,6 +389,7 @@ export const paragraphBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
                 tagName: 'div',
                 properties: {
                   className: ['affine-paragraph-block-container'],
+                  ...dirProps,
                 },
                 children: [],
               },
@@ -423,6 +427,7 @@ export const paragraphBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
                 tagName: 'div',
                 properties: {
                   className: ['affine-paragraph-block-container'],
+                  ...dirProps,
                 },
                 children: [],
               },

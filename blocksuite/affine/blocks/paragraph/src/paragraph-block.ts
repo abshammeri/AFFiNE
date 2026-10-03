@@ -11,11 +11,13 @@ import {
   BlockElementCommentManager,
   CitationProvider,
   DocModeProvider,
+  getGlobalTextDirection,
 } from '@blocksuite/affine-shared/services';
 import {
   calculateCollapsedSiblings,
   getNearestHeadingBefore,
   getViewportElement,
+  resolveTextDirection,
 } from '@blocksuite/affine-shared/utils';
 import type { BlockComponent } from '@blocksuite/std';
 import { TextSelection } from '@blocksuite/std';
@@ -27,6 +29,7 @@ import { computed, effect, signal } from '@preact/signals-core';
 import { html, nothing, type TemplateResult } from 'lit';
 import { query } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -287,13 +290,17 @@ export class ParagraphBlockComponent extends CaptionedBlockComponent<ParagraphBl
     const textAlignStyle = styleMap({
       textAlign: this.model.props.textAlign$?.value,
     });
+    const dir = resolveTextDirection(
+      this.model.props.textDirection$?.value,
+      getGlobalTextDirection(this.std)
+    );
 
     const childrenId = `heading-children-${this.model.id}`;
     const children = html`<div
       id=${childrenId}
       class="affine-block-children-container"
       style=${styleMap({
-        paddingLeft: `${BLOCK_CHILDREN_CONTAINER_PADDING_LEFT}px`,
+        paddingInlineStart: `${BLOCK_CHILDREN_CONTAINER_PADDING_LEFT}px`,
         display: collapsed ? 'none' : undefined,
       })}
     >
@@ -308,6 +315,13 @@ export class ParagraphBlockComponent extends CaptionedBlockComponent<ParagraphBl
           .heading-icon {
           transform: translateX(-48px);
         }
+        .affine-paragraph-block-container[data-has-collapsed-siblings='false']:dir(
+            rtl
+          )
+          affine-paragraph-heading-icon
+          .heading-icon {
+          transform: translateX(48px);
+        }
       </style>
       <div
         class=${classMap({
@@ -315,6 +329,7 @@ export class ParagraphBlockComponent extends CaptionedBlockComponent<ParagraphBl
           'highlight-comment': this.isCommentHighlighted,
         })}
         style="${textAlignStyle}"
+        dir=${ifDefined(dir)}
         data-has-collapsed-siblings="${collapsedSiblings.length > 0}"
       >
         <div

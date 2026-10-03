@@ -6,12 +6,14 @@ import {
   type Text,
 } from '@blocksuite/store';
 
+import type { TextDirection } from '../../consts';
 import type { BlockMeta } from '../../utils/types';
 
 export type CalloutProps = {
   icon?: IconData;
   text: Text;
   backgroundColorName?: string;
+  textDirection?: TextDirection;
 } & BlockMeta;
 
 export const CalloutBlockSchema = defineBlockSchema({
@@ -20,6 +22,7 @@ export const CalloutBlockSchema = defineBlockSchema({
     icon: { type: 'emoji', unicode: '💡' } as IconData,
     text: internal.Text(),
     backgroundColorName: 'grey',
+    textDirection: undefined,
     'meta:createdAt': undefined,
     'meta:updatedAt': undefined,
     'meta:createdBy': undefined,

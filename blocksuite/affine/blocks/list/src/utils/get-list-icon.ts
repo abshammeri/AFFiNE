@@ -48,6 +48,7 @@ export function getListIcon(
       return html`<div
         contenteditable="false"
         class="affine-list-block__prefix affine-list-block__numbered"
+        dir="ltr"
         @click=${onClick}
       >
         ${model.props.order ? getNumberPrefix(model.props.order, deep) : '1.'}

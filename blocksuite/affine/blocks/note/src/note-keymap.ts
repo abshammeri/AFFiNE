@@ -8,6 +8,7 @@ import {
 import {
   textAlignConfigs,
   textConversionConfigs,
+  textDirectionConfigs,
 } from '@blocksuite/affine-rich-text';
 import {
   focusBlockEnd,
@@ -40,6 +41,7 @@ import {
   selectBlock,
   selectBlocksBetween,
   updateBlockAlign,
+  updateBlockTextDirection,
   updateBlockType,
 } from './commands';
 import { moveBlockConfigs } from './move-block';
@@ -159,6 +161,22 @@ class NoteKeymap {
         },
         {} as Record<string, UIEventHandler>
       );
+  };
+
+  private readonly _bindTextDirectionHotKey = () => {
+    const keymap: Record<string, UIEventHandler> = {};
+    textDirectionConfigs.forEach(({ hotkey, textDirection }) => {
+      hotkey?.forEach(key => {
+        keymap[key] = ctx => {
+          const [result] = this._std.command.exec(updateBlockTextDirection, {
+            textDirection,
+          });
+          if (result) ctx.get('defaultState').event.preventDefault();
+          return result;
+        };
+      });
+    });
+    return keymap;
   };
 
   private readonly _bindTextAlignHotKey = () => {
@@ -603,6 +621,7 @@ class NoteKeymap {
       ...this._bindQuickActionHotKey(),
       ...this._bindTextConversionHotKey(),
       ...this._bindTextAlignHotKey(),
+      ...this._bindTextDirectionHotKey(),
       Tab: ctx => {
         const [success] = this.std.command.exec(indentBlocks);
 

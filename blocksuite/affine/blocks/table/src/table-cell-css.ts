@@ -10,6 +10,25 @@ export const cellContainerStyle = css({
   isolation: 'auto',
   textAlign: 'start',
   verticalAlign: 'top',
+  // A cell often holds several lines of mixed Arabic / English text. Let each
+  // line (v-line) pick its own direction and align to its own start edge
+  // instead of inheriting one direction for the whole cell.
+  // The v-line's inner div is an inline-block that shrinks to its text, so a
+  // short line could not align to its own start edge. Make it a full-width
+  // block inside cells so `plaintext` both resolves and aligns each line.
+  '& v-line > div': {
+    display: 'block !important' as 'block',
+    unicodeBidi: 'plaintext',
+    textAlign: 'start',
+  },
+  // v-text renders spans with an inline `word-break: break-word`, which acts
+  // like `overflow-wrap: anywhere` and lets the cell's min-content shrink to a
+  // single character, so narrow columns split words ("Versio-n"). In cells,
+  // only wrap between words; the column grows to fit its longest word.
+  '& v-text > span': {
+    wordBreak: 'normal !important' as 'normal',
+    overflowWrap: 'break-word',
+  },
   'affine-table[data-internal-range-selection="true"] &': {
     userSelect: 'text',
     WebkitUserSelect: 'text',

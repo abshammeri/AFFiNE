@@ -11,6 +11,16 @@ export enum TextAlign {
 
 export const TextAlignMap = createEnumMap(TextAlign);
 
+/**
+ * Per-block writing direction of a text block.
+ * `undefined` on a block means "inherit the editor-wide direction".
+ */
+export enum TextDirection {
+  Auto = 'auto',
+  LTR = 'ltr',
+  RTL = 'rtl',
+}
+
 export enum TextVerticalAlign {
   Bottom = 'bottom',
   Center = 'center',
@@ -66,3 +76,4 @@ export const FontFamilySchema = z.nativeEnum(FontFamily);
 export const FontWeightSchema = z.nativeEnum(FontWeight);
 export const FontStyleSchema = z.nativeEnum(FontStyle);
 export const TextAlignSchema = z.nativeEnum(TextAlign);
+export const TextDirectionSchema = z.nativeEnum(TextDirection);

@@ -1,6 +1,14 @@
 export { type TextAlignConfig, textAlignConfigs } from './align';
 export { type TextConversionConfig, textConversionConfigs } from './conversion';
 export {
+  TextDirectionAutoIcon,
+  type TextDirectionConfig,
+  textDirectionConfigs,
+  TextDirectionLtrIcon,
+  TextDirectionResetIcon,
+  TextDirectionRtlIcon,
+} from './direction';
+export {
   asyncGetRichText,
   asyncSetInlineRange,
   cleanSpecifiedTail,

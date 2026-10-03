@@ -157,6 +157,9 @@ export const listBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
           tagName: 'li',
           properties: {
             className: ['affine-list-block-container'],
+            ...(o.node.props.textDirection
+              ? { dir: o.node.props.textDirection as string }
+              : {}),
           },
           children: liChildren,
         },

@@ -8,6 +8,8 @@ import {
   textAlignConfigs,
   type TextConversionConfig,
   textConversionConfigs,
+  type TextDirectionConfig,
+  textDirectionConfigs,
 } from '@blocksuite/affine-rich-text';
 import {
   getSelectedModelsCommand,
@@ -23,7 +25,12 @@ import {
 import { HeadingsIcon } from '@blocksuite/icons/lit';
 import { BlockSelection } from '@blocksuite/std';
 
-import { updateBlockAlign, updateBlockType } from '../commands';
+import {
+  TEXT_DIRECTION_FLAVOURS,
+  updateBlockAlign,
+  updateBlockTextDirection,
+  updateBlockType,
+} from '../commands';
 import { tooltips } from './tooltips';
 
 let basicIndex = 0;
@@ -68,6 +75,10 @@ const noteSlashMenuConfig: SlashMenuConfig = {
 
     ...textAlignConfigs.map((config, index) =>
       createAlignItem(config, `2_Align@${index++}`)
+    ),
+
+    ...textDirectionConfigs.map((config, index) =>
+      createDirectionItem(config, `2_Text Direction@${index}`)
     ),
 
     ...textFormatConfigs
@@ -116,6 +127,27 @@ function createAlignItem(
         .pipe(getSelectedModelsCommand, { types: ['text'] })
         .pipe(updateBlockAlign, { textAlign })
         .run();
+    },
+  };
+}
+
+function createDirectionItem(
+  config: TextDirectionConfig,
+  group?: SlashMenuItem['group']
+): SlashMenuActionItem {
+  const { textDirection, name, description, icon, searchAlias } = config;
+  return {
+    name,
+    group,
+    description,
+    icon,
+    searchAlias,
+    when: ({ model }) => TEXT_DIRECTION_FLAVOURS.has(model.flavour),
+    action: ({ std, model }) => {
+      std.command.exec(updateBlockTextDirection, {
+        textDirection,
+        selectedModels: [model],
+      });
     },
   };
 }
