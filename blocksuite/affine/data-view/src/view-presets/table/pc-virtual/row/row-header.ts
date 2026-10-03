@@ -7,6 +7,7 @@ import { nothing } from 'lit';
 import { property } from 'lit/decorators.js';
 import { html } from 'lit/static-html.js';
 
+import { VIRTUAL_ROW_DRAG_HANDLER_CLASS } from '../controller/drag.js';
 import type { VirtualTableViewUILogic } from '../table-view-ui-logic.js';
 import type { TableGridCell } from '../types.js';
 import * as styles from './row-header-css.js';
@@ -37,6 +38,13 @@ export class TableRowHeader extends SignalWatcher(
       this.gridCell.data.hover$.value = false;
     });
   }
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // Virtualized cells can be removed while hovered, in which case no
+    // `mouseleave` fires; don't leave the row stuck in the hovered state.
+    this.gridCell.data.hover$.value = false;
+  }
+
   private readonly selectRow = () => {
     if (this.view.readonly$.value) {
       return;
@@ -54,6 +62,7 @@ export class TableRowHeader extends SignalWatcher(
 
   renderDragHandle = () => {
     const dragHandlerClass = clsx(
+      VIRTUAL_ROW_DRAG_HANDLER_CLASS,
       styles.dragHandler,
       this.rowSelected$.value && styles.rowSelectedBg,
       this.rowHover$.value && styles.show

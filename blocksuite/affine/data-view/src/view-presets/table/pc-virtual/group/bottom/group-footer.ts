@@ -1,8 +1,8 @@
-import { WithDisposable } from '@blocksuite/global/lit';
+import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import { PlusIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
 import { computed } from '@preact/signals-core';
-import { html } from 'lit';
+import { html, nothing } from 'lit';
 import { property } from 'lit/decorators.js';
 
 import { TableViewAreaSelection } from '../../../selection';
@@ -10,7 +10,9 @@ import type { VirtualTableViewUILogic } from '../../table-view-ui-logic';
 import type { TableGridGroup } from '../../types';
 import * as styles from './group-footer-css';
 
-export class TableGroupFooter extends WithDisposable(ShadowlessElement) {
+export class TableGroupFooter extends SignalWatcher(
+  WithDisposable(ShadowlessElement)
+) {
   @property({ attribute: false })
   accessor tableViewLogic!: VirtualTableViewUILogic;
 
@@ -36,6 +38,11 @@ export class TableGroupFooter extends WithDisposable(ShadowlessElement) {
   override connectedCallback() {
     super.connectedCallback();
     this.classList.add(styles.groupFooter);
+    // A collapsed group renders an empty footer. Keep a non-zero width so the
+    // virtual wrapper's ResizeObserver still reports its (0px) height; a 0x0
+    // element never gets an initial observation, which would leave the
+    // group's bottom unknown and stop every following group from rendering.
+    this.style.minWidth = '1px';
     this.disposables.addFromEvent(this, 'mouseenter', () => {
       this.gridGroup.data.footerHover$.value = true;
     });
@@ -73,6 +80,12 @@ export class TableGroupFooter extends WithDisposable(ShadowlessElement) {
   };
 
   override render() {
+    if (
+      this.group$.value &&
+      this.tableViewLogic.groupCollapsed$(this.gridGroup.groupId).value
+    ) {
+      return nothing;
+    }
     return html`
       ${
         this.tableViewManager.readonly$.value

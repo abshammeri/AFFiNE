@@ -6,6 +6,7 @@ import {
 import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import { AddCursorIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
+import { signal } from '@preact/signals-core';
 import { css, nothing } from 'lit';
 import { property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -14,6 +15,7 @@ import { html } from 'lit/static-html.js';
 import { GroupTitle } from '../../../core/group-by/group-title.js';
 import type { Group } from '../../../core/group-by/trait.js';
 import { dragHandler } from '../../../core/utils/wc-dnd/dnd-context.js';
+import { KANBAN_GROUP_PAGE_SIZE } from '../consts.js';
 import type { MobileKanbanViewUILogic } from './kanban-view-ui-logic.js';
 
 const styles = css`
@@ -52,6 +54,18 @@ const styles = css`
     line-height: var(--data-view-cell-text-line-height);
     color: var(--affine-text-secondary-color);
   }
+
+  .mobile-kanban-show-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: var(--data-view-cell-text-size);
+    line-height: var(--data-view-cell-text-line-height);
+    color: var(--affine-text-secondary-color);
+    user-select: none;
+  }
 `;
 
 export class MobileKanbanGroup extends SignalWatcher(
@@ -59,8 +73,19 @@ export class MobileKanbanGroup extends SignalWatcher(
 ) {
   static override styles = styles;
 
+  readonly visibleLimit$ = signal(KANBAN_GROUP_PAGE_SIZE);
+
+  private readonly showMore = () => {
+    this.visibleLimit$.value += KANBAN_GROUP_PAGE_SIZE;
+  };
+
   private readonly clickAddCard = () => {
     this.view.addCard('end', this.group.key);
+    // Make sure the new (last) card is rendered.
+    this.visibleLimit$.value = Math.max(
+      this.visibleLimit$.value,
+      this.group.rows.length
+    );
     this.requestUpdate();
   };
 
@@ -97,7 +122,9 @@ export class MobileKanbanGroup extends SignalWatcher(
   };
 
   override render() {
-    const cards = this.group.rows;
+    const rows = this.group.rows;
+    const cards = rows.slice(0, this.visibleLimit$.value);
+    const hiddenCount = rows.length - cards.length;
     return html`
       <div class="mobile-group-header" ${dragHandler(this.group.key)}>
         ${GroupTitle(this.group, {
@@ -121,6 +148,17 @@ export class MobileKanbanGroup extends SignalWatcher(
             `;
           }
         )}
+        ${
+          hiddenCount > 0
+            ? html`<div
+                class="mobile-kanban-show-more"
+                role="button"
+                @click="${this.showMore}"
+              >
+                Show ${Math.min(hiddenCount, KANBAN_GROUP_PAGE_SIZE)} more
+              </div>`
+            : nothing
+        }
         ${
           this.view.readonly$.value
             ? nothing

@@ -39,6 +39,13 @@ export class TableRowLast extends SignalWatcher(
     });
   }
 
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // Virtualized cells can be removed while hovered, in which case no
+    // `mouseleave` fires; don't leave the row stuck in the hovered state.
+    this.gridCell.data.hover$.value = false;
+  }
+
   protected override render() {
     return html``;
   }

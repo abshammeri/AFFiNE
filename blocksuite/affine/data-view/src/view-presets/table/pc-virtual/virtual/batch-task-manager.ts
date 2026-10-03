@@ -59,20 +59,25 @@ export class BatchTaskManager {
     return linkedListNode;
   }
 
+  /**
+   * Per-frame time budget (ms). Each priority always runs at least its batch
+   * size; beyond that, tasks keep running while the frame budget allows, so
+   * measuring a large table doesn't take thousands of frames.
+   */
+  private readonly frameBudget = 8;
+
   private run(): void {
+    const start = performance.now();
     let totalBatchCount = this.totalBatchSize;
-    let skipCount = 0;
-    let tasksExecuted = false;
-    const runTaskArr = this.queues.map(() => 0);
     for (let i = this.queues.length - 1; i >= 0; i--) {
       const queue = this.queues[i];
       let priorityBatchCount = this.batchSizes[i];
-      if (!queue || !priorityBatchCount) continue;
-      while (
-        !queue.isEmpty() &&
-        totalBatchCount > 0 &&
-        priorityBatchCount > 0
-      ) {
+      if (!queue || priorityBatchCount == null) continue;
+      while (!queue.isEmpty()) {
+        const withinMinimum = totalBatchCount > 0 && priorityBatchCount > 0;
+        if (!withinMinimum && performance.now() - start > this.frameBudget) {
+          break;
+        }
         const node = queue.pop();
         if (!node) break;
 
@@ -82,21 +87,8 @@ export class BatchTaskManager {
         if (result !== false) {
           totalBatchCount--;
           priorityBatchCount--;
-          tasksExecuted = true;
-          runTaskArr[i] = (runTaskArr[i] ?? 0) + 1;
         }
       }
-    }
-
-    if (tasksExecuted) {
-      console.log(
-        'run task count',
-        ...runTaskArr,
-        'skip count',
-        skipCount,
-        'total task count',
-        ...this.queues.map(arr => arr.size)
-      );
     }
 
     const hasRemainingTasks = this.queues.some(queue => !queue.isEmpty());

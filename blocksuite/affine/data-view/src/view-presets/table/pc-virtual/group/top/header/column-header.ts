@@ -7,6 +7,7 @@ import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import { PlusIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
 import { css } from '@emotion/css';
+import { effect } from '@preact/signals-core';
 import { nothing } from 'lit';
 import { property, query } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -14,10 +15,16 @@ import { styleMap } from 'lit/directives/style-map.js';
 import { html } from 'lit/static-html.js';
 
 import { renderUniLit } from '../../../../../../core';
+import { createDndContext } from '../../../../../../core/utils/wc-dnd/dnd-context';
+import { defaultActivators } from '../../../../../../core/utils/wc-dnd/sensors/index';
+import { linearMove } from '../../../../../../core/utils/wc-dnd/utils/linear-move';
 import { LEFT_TOOL_BAR_WIDTH } from '../../../../consts';
 import { cellDivider } from '../../../../styles';
 import type { VirtualTableViewUILogic } from '../../../table-view-ui-logic';
+import type { TableGridGroup } from '../../../types';
 import * as styles from './column-header-css';
+import { DatabaseHeaderColumn } from './single-column-header';
+import { getVerticalIndicator } from './vertical-indicator';
 const leftBarStyle = css({
   width: LEFT_TOOL_BAR_WIDTH,
 });
@@ -76,9 +83,100 @@ export class VirtualTableHeader extends SignalWatcher(
     return this.tableViewManager.readonly$.value;
   }
 
+  /**
+   * Drag a column header to reorder columns (same behaviour as the
+   * non-virtual table, which owns its dnd context in each table group).
+   */
+  dndContext = createDndContext({
+    activators: defaultActivators,
+    container: this,
+    modifiers: [
+      ({ transform }) => {
+        return {
+          ...transform,
+          y: 0,
+        };
+      },
+    ],
+    onDragEnd: ({ over, active }) => {
+      if (this.readonly) return;
+      if (over && over.id !== active.id) {
+        const properties = this.tableViewManager.properties$.value;
+        const activeIndex = properties.findIndex(data => data.id === active.id);
+        const overIndex = properties.findIndex(data => data.id === over.id);
+        this.tableViewManager.propertyGetOrCreate(active.id).move({
+          before: activeIndex > overIndex,
+          id: over.id,
+        });
+      }
+    },
+    collisionDetection: linearMove(true),
+    createOverlay: active => {
+      if (this.readonly) return;
+      const column = this.tableViewManager.propertyGetOrCreate(active.id);
+      const preview = new DatabaseHeaderColumn();
+      preview.column = column;
+      preview.tableViewLogic = this.tableViewLogic;
+      preview.classList.add(styles.column, styles.cell);
+      Object.assign(preview.style, {
+        position: 'fixed',
+        zIndex: '999',
+        pointerEvents: 'none',
+        width: `${active.rect.width}px`,
+        height: `${active.rect.height}px`,
+        top: `${active.rect.top}px`,
+        left: `${active.rect.left}px`,
+        backgroundColor: 'var(--affine-background-primary-color)',
+        boxShadow: 'var(--affine-shadow-2)',
+        opacity: '0.9',
+      });
+      document.body.append(preview);
+      return {
+        overlay: preview,
+        cleanup: () => {
+          preview.remove();
+        },
+      };
+    },
+  });
+
+  private showIndicator() {
+    const indicator = getVerticalIndicator();
+    this.disposables.add(
+      effect(() => {
+        const active = this.dndContext.active$.value;
+        const over = this.dndContext.over$.value;
+        if (!active || !over) {
+          indicator.remove();
+          return;
+        }
+        const scrollX = this.dndContext.scrollOffset$.value.x;
+        const content = this.tableViewLogic.virtualScroll$.value?.content;
+        const rowsBottom = this.gridGroup?.lastRowBottom$.value;
+        const bottom =
+          content && rowsBottom != null
+            ? content.getBoundingClientRect().top + rowsBottom
+            : this.getBoundingClientRect().bottom;
+        const left =
+          over.rect.left < active.rect.left ? over.rect.left : over.rect.right;
+        indicator.display(
+          left - scrollX,
+          over.rect.top,
+          Math.max(bottom - over.rect.top, over.rect.height)
+        );
+      })
+    );
+    this.disposables.add(() => {
+      if (this.dndContext.active$.peek()) {
+        indicator.remove();
+      }
+    });
+  }
+
   override connectedCallback() {
     super.connectedCallback();
     this.classList.add(styles.columnHeaderContainer);
+    this.showIndicator();
   }
 
   override render() {
@@ -122,6 +220,9 @@ export class VirtualTableHeader extends SignalWatcher(
 
   @property({ attribute: false })
   accessor tableViewLogic!: VirtualTableViewUILogic;
+
+  @property({ attribute: false })
+  accessor gridGroup: TableGridGroup | undefined = undefined;
 
   get tableViewManager() {
     return this.tableViewLogic.view;

@@ -1,8 +1,9 @@
 import { popupTargetFromElement } from '@blocksuite/affine-components/context-menu';
 import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
+import { CenterPeekIcon, MoreHorizontalIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
 import { computed, effect, signal } from '@preact/signals-core';
-import { css } from 'lit';
+import { css, html, nothing } from 'lit';
 import { property } from 'lit/decorators.js';
 
 import { renderUniLit } from '../../../../core';
@@ -18,13 +19,14 @@ import {
 } from '../../selection';
 import type { VirtualTableViewUILogic } from '../table-view-ui-logic';
 import type { TableGridCell } from '../types';
-import { popRowMenu } from './menu';
+import { openDetail, popRowMenu } from './menu';
 import { rowSelectedBg } from './row-header-css';
 export class DatabaseCellContainer extends SignalWatcher(
   WithDisposable(ShadowlessElement)
 ) {
   static override styles = css`
     affine-database-virtual-cell-container {
+      position: relative;
       display: flex;
       align-items: start;
       width: 100%;
@@ -39,6 +41,49 @@ export class DatabaseCellContainer extends SignalWatcher(
 
     affine-database-virtual-cell-container uni-lit > *:first-child {
       padding: 6px;
+    }
+
+    .dv-virtual-row-ops {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+      cursor: pointer;
+      z-index: 1;
+    }
+
+    .dv-virtual-row-op {
+      display: flex;
+      padding: 4px;
+      border-radius: 4px;
+      box-shadow: var(--affine-button-shadow);
+      background-color: var(--affine-background-primary-color);
+      position: relative;
+    }
+
+    .dv-virtual-row-op:hover:before {
+      content: '';
+      border-radius: 4px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      background-color: var(--affine-hover-color);
+    }
+
+    .dv-virtual-row-op svg {
+      fill: var(--affine-icon-color);
+      color: var(--affine-icon-color);
+      width: 16px;
+      height: 16px;
+    }
+
+    @media print {
+      .dv-virtual-row-ops {
+        display: none;
+      }
     }
   `;
 
@@ -143,6 +188,13 @@ export class DatabaseCellContainer extends SignalWatcher(
     }
   }
 
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // Virtualized cells can be removed while hovered, in which case no
+    // `mouseleave` fires; don't leave the row stuck in the hovered state.
+    this.gridCell.data.hover$.value = false;
+  }
+
   isRowSelected$ = computed(() => {
     const selection = this.selectionView?.selection;
     if (selection?.selectionType !== 'row') {
@@ -164,6 +216,68 @@ export class DatabaseCellContainer extends SignalWatcher(
     return selection.focus.rowIndex === this.rowIndex$.value;
   }
 
+  private readonly selectThisRow = () => {
+    const row = { id: this.rowId, groupKey: this.groupKey };
+    const selection = this.selectionView.selection;
+    if (!TableViewRowSelection.includes(selection, row)) {
+      this.selectionView.selection = TableViewRowSelection.create({
+        rows: [row],
+      });
+    }
+  };
+
+  private readonly clickOpenDetail = (e: MouseEvent) => {
+    e.stopPropagation();
+    this.selectionView.selection = TableViewRowSelection.create({
+      rows: [{ id: this.rowId, groupKey: this.groupKey }],
+    });
+    openDetail(this.tableViewLogic, this.rowId, this.selectionView);
+  };
+
+  private readonly clickRowMenu = (e: MouseEvent) => {
+    e.stopPropagation();
+    const ele = e.currentTarget as HTMLElement;
+    this.selectThisRow();
+    popRowMenu(
+      this.tableViewLogic,
+      popupTargetFromElement(ele),
+      this.selectionView
+    );
+  };
+
+  /**
+   * Peek / more buttons on the title cell, shown while hovering the row
+   * (mirrors the row ops of the non-virtual table).
+   */
+  private renderRowOps() {
+    const column = this.column$.value;
+    if (
+      !column ||
+      column.readonly$.value ||
+      this.view.mainProperties$.value.titleColumn !== this.columnId ||
+      !this.gridCell.row.data.hover$.value ||
+      this.isEditing$.value
+    ) {
+      return nothing;
+    }
+    return html`<div class="dv-virtual-row-ops">
+      <div
+        class="dv-virtual-row-op"
+        data-testid="dv-row-open-detail"
+        @click="${this.clickOpenDetail}"
+      >
+        ${CenterPeekIcon()}
+      </div>
+      ${
+        this.view.readonly$.value
+          ? nothing
+          : html`<div class="dv-virtual-row-op" @click="${this.clickRowMenu}">
+              ${MoreHorizontalIcon()}
+            </div>`
+      }
+    </div>`;
+  }
+
   override render() {
     const renderer = this.column$.value?.renderer$.value;
     if (!renderer) {
@@ -178,12 +292,12 @@ export class DatabaseCellContainer extends SignalWatcher(
       selectCurrentCell: this.selectCurrentCell,
     };
 
-    return renderUniLit(view, props, {
+    return html`${renderUniLit(view, props, {
       ref: this._cell,
       style: {
         display: 'contents',
       },
-    });
+    })}${this.renderRowOps()}`;
   }
 
   private _tagDraft: string | undefined;

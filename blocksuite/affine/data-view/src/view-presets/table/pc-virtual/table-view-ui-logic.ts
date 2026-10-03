@@ -4,8 +4,9 @@ import {
   popupTargetFromElement,
 } from '@blocksuite/affine-components/context-menu';
 import type { InsertToPosition } from '@blocksuite/affine-shared/utils';
+import { DisposableGroup } from '@blocksuite/global/disposable';
 import { AddCursorIcon } from '@blocksuite/icons/lit';
-import { computed, signal } from '@preact/signals-core';
+import { computed, type Signal, signal } from '@preact/signals-core';
 import { cssVarV2 } from '@toeverything/theme/v2';
 import type { TemplateResult } from 'lit';
 import { styleMap } from 'lit/directives/style-map.js';
@@ -24,6 +25,7 @@ import {
   DataViewUIBase,
   DataViewUILogicBase,
 } from '../../../core/view/data-view-base.js';
+import { getCollapsedState, setCollapsedState } from '../collapsed-state.js';
 import { LEFT_TOOL_BAR_WIDTH } from '../consts.js';
 import {
   TableViewRowSelection,
@@ -104,16 +106,53 @@ export class VirtualTableViewUILogic extends DataViewUILogicBase<
     );
     return groups.map(group => ({
       id: group.key,
-      rows: group.rows.map(v => v.rowId),
+      rows: this.groupCollapsed$(group.key).value
+        ? []
+        : group.rows.map(v => v.rowId),
     }));
   });
+
+  private readonly collapsedGroups = new Map<string, Signal<boolean>>();
+
+  /**
+   * Collapsed state of a group, shared with the non-virtual table through
+   * session storage.
+   */
+  groupCollapsed$(groupKey: string): Signal<boolean> {
+    const key = groupKey || 'all';
+    let collapsed = this.collapsedGroups.get(key);
+    if (!collapsed) {
+      collapsed = signal(getCollapsedState(this.view.id, key));
+      this.collapsedGroups.set(key, collapsed);
+    }
+    return collapsed;
+  }
+
+  toggleGroupCollapsed(groupKey: string) {
+    const collapsed$ = this.groupCollapsed$(groupKey);
+    const next = !collapsed$.value;
+    collapsed$.value = next;
+    setCollapsedState(this.view.id, groupKey || 'all', next);
+    if (next && this.selection$.value) {
+      // Selection is index based; drop it rather than pointing at hidden rows.
+      this.clearSelection();
+    }
+  }
 
   clearSelection = () => {
     this.selectionController.clear();
   };
 
   addRow = (position: InsertToPosition) => {
-    return this.view.rowAdd(position);
+    if (this.view.readonly$.value) return;
+    const rowId = this.view.rowAdd(position);
+    if (rowId) {
+      this.root.openDetailPanel({
+        view: this.view,
+        rowId,
+      });
+    }
+    return rowId;
   };
 
   focusFirstCell = () => {
@@ -287,13 +326,26 @@ export class TableViewUI extends DataViewUIBase<VirtualTableViewUILogic> {
   override connectedCallback(): void {
     super.connectedCallback();
     this.logic.ui$.value = this;
-    this.logic.clipboardController.hostConnected();
-    this.logic.dragController.hostConnected();
-    this.logic.hotkeysController.hostConnected();
-    this.logic.selectionController.hostConnected();
+    const controllers = [
+      this.logic.clipboardController,
+      this.logic.dragController,
+      this.logic.hotkeysController,
+      this.logic.selectionController,
+    ];
+    controllers.forEach(controller => controller.hostConnected());
+    // The logic (and its controllers) outlives this element when switching
+    // views, so release the handlers registered for this host on disconnect;
+    // otherwise they pile up every time the view is shown again.
+    this.disposables.add(() => {
+      controllers.forEach(controller => {
+        controller.disposables.dispose();
+        controller.disposables = new DisposableGroup();
+      });
+    });
     const scrollContainer = getScrollContainer(this, 'y') ?? document.body;
     this.logic.initVirtualScroll(scrollContainer, this);
-    this.classList.add(styles.tableView);
+    this.classList.add('affine-database-table', styles.tableView);
+    this.dataset['testid'] = 'dv-table-view';
   }
 
   override render(): TemplateResult {
@@ -307,13 +359,23 @@ export class TableViewUI extends DataViewUIBase<VirtualTableViewUILogic> {
       paddingRight: `${vPadding}px`,
     });
     return html`
-      ${renderUniLit(this.logic.root.config.headerWidget, {
-        dataViewLogic: this.logic,
-      })}
+      ${
+        this.logic.headerWidget
+          ? renderUniLit(this.logic.headerWidget, {
+              dataViewLogic: this.logic,
+            })
+          : ''
+      }
       <div class="${styles.tableContainer}" style="${wrapperStyle}">
         <div class="${styles.tableBlockTable}" @wheel="${this.logic.onWheel}">
           <div class="${styles.tableContainer2}" style="${containerStyle}">
-            ${this.renderTable()}
+            ${
+              this.logic.groupTrait$.value?.allHidden$.value
+                ? html`<div class="${styles.groupsHiddenMessage}">
+                    All groups are hidden
+                  </div>`
+                : this.renderTable()
+            }
           </div>
         </div>
       </div>
