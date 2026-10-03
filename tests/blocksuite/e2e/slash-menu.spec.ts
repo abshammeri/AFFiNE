@@ -85,7 +85,9 @@ test.describe('slash menu should show and hide correctly', () => {
     );
   });
 
-  test('slash menu should hide after input whitespace', async ({ page }) => {
+  test('slash menu should hide after input whitespace right after slash', async ({
+    page,
+  }) => {
     await initEmptyParagraphState(page);
     const slashMenu = page.locator(`.slash-menu`);
     await focusRichText(page);
@@ -96,13 +98,24 @@ test.describe('slash menu should show and hide correctly', () => {
     await assertRichTexts(page, ['/ ']);
     await pressBackspace(page);
     await expect(slashMenu).toBeVisible();
+  });
 
-    await type(page, 'head');
+  test('slash menu should allow whitespace inside the query', async ({
+    page,
+  }) => {
+    await initEmptyParagraphState(page);
+    const slashMenu = page.locator(`.slash-menu`);
+    const slashItems = slashMenu.locator('icon-button');
+    await focusRichText(page);
+    await type(page, '/');
     await expect(slashMenu).toBeVisible();
-    await type(page, ' ');
-    await expect(slashMenu).toBeHidden();
-    await pressBackspace(page);
+
+    await type(page, 'heading ');
     await expect(slashMenu).toBeVisible();
+    await type(page, '2');
+    await expect(slashMenu).toBeVisible();
+    await expect(slashItems.first().locator('.text')).toHaveText(['Heading 2']);
+    await assertRichTexts(page, ['/heading 2']);
   });
 
   test('delete the slash symbol should close the slash menu', async ({
@@ -121,26 +134,32 @@ test.describe('slash menu should show and hide correctly', () => {
     );
   });
 
-  test('typing something that does not match should close the slash menu', async ({
+  test('typing something that does not match should show no results and then close the slash menu', async ({
     page,
   }) => {
     await initEmptyParagraphState(page);
     const slashMenu = page.locator(`.slash-menu`);
+    const noResult = slashMenu.locator('.slash-menu-no-result');
     await focusRichText(page);
     await type(page, '/');
     await expect(slashMenu).toBeVisible();
 
     await type(page, '_');
-    await expect(slashMenu).toBeHidden();
+    await expect(noResult).toBeVisible();
+    await expect(slashMenu.locator('icon-button')).toHaveCount(0);
     await assertRichTexts(page, ['/_']);
 
-    // And pressing backspace immediately should reappear the slash menu
+    // And pressing backspace should bring the items back
     await pressBackspace(page);
-    await expect(slashMenu).toBeVisible();
+    await expect(noResult).toBeHidden();
+    await expect(slashMenu.locator('icon-button').first()).toBeVisible();
 
-    await type(page, '__');
-    await pressBackspace(page);
+    // Keep typing after no results should close the slash menu
+    await type(page, '____');
+    await expect(noResult).toBeVisible();
+    await type(page, '_');
     await expect(slashMenu).toBeHidden();
+    await assertRichTexts(page, ['/_____']);
   });
 
   test('pressing the slash key again should close the old slash menu and open new one', async ({
@@ -609,14 +628,10 @@ test.describe('slash search', () => {
 
     await type(page, 'c');
     await expect(slashItems).toHaveCount(12);
+    // prefix matches come first
     await expect(slashItems.nth(0).locator('.text')).toHaveText(['Copy']);
-    await expect(slashItems.nth(1).locator('.text')).toHaveText(['Italic']);
-    await expect(slashItems.nth(2).locator('.text')).toHaveText(['Callout']);
-    await expect(slashItems.nth(3).locator('.text')).toHaveText(['New Doc']);
-    await expect(slashItems.nth(4).locator('.text')).toHaveText(['Duplicate']);
-    await expect(slashItems.nth(5).locator('.text')).toHaveText(['Code Block']);
-    await expect(slashItems.nth(6).locator('.text')).toHaveText(['Linked Doc']);
-    await expect(slashItems.nth(7).locator('.text')).toHaveText(['Attachment']);
+    await expect(slashItems.nth(1).locator('.text')).toHaveText(['Callout']);
+    await expect(slashItems.nth(2).locator('.text')).toHaveText(['Code Block']);
     await type(page, 'b');
     await expect(slashItems.nth(0).locator('.text')).toHaveText(['Code Block']);
   });

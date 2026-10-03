@@ -1,6 +1,6 @@
 import { unsafeCSSVarV2 } from '@blocksuite/affine-shared/theme';
 import { WithDisposable } from '@blocksuite/global/lit';
-import { ToggleDownIcon, ToggleRightIcon } from '@blocksuite/icons/lit';
+import { ToggleDownIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
 import { css, unsafeCSS } from 'lit';
 import { property } from 'lit/decorators.js';
@@ -58,7 +58,12 @@ export class ToggleButton extends WithDisposable(ShadowlessElement) {
     .toggle-icon {
       svg {
         color: ${unsafeCSSVarV2('icon/primary', '#77757D')};
+        transition: transform 150ms ease-in-out;
       }
+    }
+
+    .toggle-icon[data-collapsed='true'] svg {
+      transform: rotate(-90deg);
     }
   `;
 
@@ -74,7 +79,7 @@ export class ToggleButton extends WithDisposable(ShadowlessElement) {
         aria-controls=${this.controls}
         @click=${() => this.updateCollapsed(!this.collapsed)}
       >
-        ${(this.collapsed ? ToggleRightIcon : ToggleDownIcon)({
+        ${ToggleDownIcon({
           width: '16px',
           height: '16px',
         })}

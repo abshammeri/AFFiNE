@@ -29,7 +29,24 @@ export const styles = css`
     border-radius: 8px;
     z-index: var(--affine-z-index-popover);
     user-select: none;
-    /* transition: max-height 0.2s ease-in-out; */
+    animation: slash-menu-fade-in 120ms ease-out;
+  }
+
+  @keyframes slash-menu-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .slash-menu-no-result {
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: var(--affine-font-sm);
+    line-height: var(--affine-line-height);
+    color: ${unsafeCSSVarV2('text/secondary')};
   }
 
   ${scrollbarStyle('.slash-menu')}
