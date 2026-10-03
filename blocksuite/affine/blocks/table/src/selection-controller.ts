@@ -1,5 +1,4 @@
 import {
-  domToOffsets,
   getAreaByOffsets,
   getTargetIndexByDraggingOffset,
 } from '@blocksuite/affine-shared/utils';
@@ -24,6 +23,19 @@ import {
 import { cleanSelection } from './utils';
 type Cells = string[][];
 const TEXT = 'text/plain';
+
+/**
+ * Pointer math below works on a "logical" x axis that grows towards the
+ * inline end of the table: plain `clientX` for a left-to-right table, and
+ * `-clientX` for a right-to-left one (where column 0 is on the right). This
+ * keeps the offset lists monotonic so the shared drag / range helpers work
+ * unchanged in both directions.
+ */
+const logicalX = (x: number, rtl: boolean) => (rtl ? -x : x);
+const logicalStart = (rect: DOMRect, rtl: boolean) =>
+  rtl ? -rect.right : rect.left;
+const logicalEnd = (rect: DOMRect, rtl: boolean) =>
+  rtl ? -rect.left : rect.right;
 export class SelectionController implements ReactiveController {
   constructor(public readonly host: TableBlockComponent) {
     this.host.addController(this);
@@ -59,6 +71,9 @@ export class SelectionController implements ReactiveController {
   private get scale() {
     return this.host.getScale();
   }
+  private get rtl() {
+    return this.host.isRtl();
+  }
 
   widthAdjust(dragHandle: HTMLElement, event: MouseEvent) {
     event.preventDefault();
@@ -72,13 +87,16 @@ export class SelectionController implements ReactiveController {
     if (!columnId) {
       return;
     }
+    // The resize handle is on the inline-end edge of the column: dragging it
+    // left widens a column of a right-to-left table.
+    const rtl = this.rtl;
     const onMove = (event: MouseEvent) => {
       this.dataManager.widthAdjustColumnId$.value = columnId;
       this.dataManager.virtualWidth$.value = {
         columnId,
         width: Math.max(
           ColumnMinWidth,
-          (event.clientX - initialX) / this.scale + adjustedWidth
+          logicalX(event.clientX - initialX, rtl) / this.scale + adjustedWidth
         ),
       };
     };
@@ -144,7 +162,11 @@ export class SelectionController implements ReactiveController {
     if (!cellRect) {
       return;
     }
+    const rtl = this.rtl;
+    // Physical offset, to keep the preview under the pointer.
     const initialDiffX = x - cellRect.left;
+    // Logical offset, to find the drop position along the column order.
+    const initialLogicalDiffX = logicalX(x, rtl) - logicalStart(cellRect, rtl);
     const cells = Array.from(
       this.host.querySelectorAll(`td[data-column-id="${columnId}"]`)
     ).map(td => td.closest(TableCellComponentName) as TableCell);
@@ -157,9 +179,11 @@ export class SelectionController implements ReactiveController {
       this.host.querySelectorAll(`td[data-row-id="${firstCell?.row?.rowId}"]`)
     ).map(td => td.getBoundingClientRect());
     const columnOffsets = columns.flatMap((column, index) =>
-      index === columns.length - 1 ? [column.left, column.right] : [column.left]
+      index === columns.length - 1
+        ? [logicalStart(column, rtl), logicalEnd(column, rtl)]
+        : [logicalStart(column, rtl)]
     );
-    const columnDragPreview = createColumnDragPreview(cells);
+    const columnDragPreview = createColumnDragPreview(cells, rtl);
     columnDragPreview.style.top = `${cellRect.top - containerRect.top - 0.5}px`;
     columnDragPreview.style.left = `${cellRect.left - containerRect.left}px`;
     columnDragPreview.style.width = `${cellRect.width}px`;
@@ -169,7 +193,7 @@ export class SelectionController implements ReactiveController {
       const { targetIndex, isForward } = getTargetIndexByDraggingOffset(
         columnOffsets,
         draggingIndex,
-        x - initialDiffX
+        logicalX(x, rtl) - initialLogicalDiffX
       );
       if (targetIndex != null) {
         this.dataManager.ui.columnIndicatorIndex$.value = isForward
@@ -247,8 +271,13 @@ export class SelectionController implements ReactiveController {
     const rowOffsets = rows.flatMap((row, index) =>
       index === rows.length - 1 ? [row.top, row.bottom] : [row.top]
     );
-    const rowDragPreview = createRowDragPreview(cells);
-    rowDragPreview.style.left = `${cellRect.left - containerRect.left}px`;
+    const rtl = this.rtl;
+    const rowDragPreview = createRowDragPreview(cells, rtl);
+    // The handle lives in the first cell, which is the rightmost one of a
+    // right-to-left row: line the preview up with the whole row instead.
+    const rowRect = rowDragHandle.closest('tr')?.getBoundingClientRect();
+    const rowLeft = rtl && rowRect ? rowRect.left : cellRect.left;
+    rowDragPreview.style.left = `${rowLeft - containerRect.left}px`;
     rowDragPreview.style.top = `${cellRect.top - containerRect.top - 0.5}px`;
     rowDragPreview.style.height = `${cellRect.height}px`;
     this.host.append(rowDragPreview);
@@ -483,9 +512,10 @@ export class SelectionController implements ReactiveController {
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    const offsets = domToOffsets(this.host, 'tr', 'td');
+    const rtl = this.rtl;
+    const offsets = this.getCellOffsets(rtl);
     if (!offsets) return;
-    const startX = event.clientX;
+    const startX = logicalX(event.clientX, rtl);
     const startY = event.clientY;
     let selected = false;
     const initCell = target.closest('affine-table-cell');
@@ -500,7 +530,7 @@ export class SelectionController implements ReactiveController {
           return;
         }
         selected = true;
-        const endX = event.clientX;
+        const endX = logicalX(event.clientX, rtl);
         const endY = event.clientY;
         const [left, right] = startX > endX ? [endX, startX] : [startX, endX];
         const [top, bottom] = startY > endY ? [endY, startY] : [startY, endY];
@@ -520,6 +550,29 @@ export class SelectionController implements ReactiveController {
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+  }
+
+  /**
+   * Row (top / bottom) and column (logical start / end, see `logicalX`)
+   * boundaries of the cells, for mapping a pointer range to a cell range.
+   */
+  private getCellOffsets(rtl: boolean) {
+    const rowDoms = Array.from(this.host.querySelectorAll('tr'));
+    const firstRow = rowDoms[0];
+    if (!firstRow) return;
+    const rows: number[] = [];
+    rowDoms.forEach((row, index) => {
+      const rect = row.getBoundingClientRect();
+      if (index === 0) rows.push(rect.top);
+      rows.push(rect.bottom);
+    });
+    const columns: number[] = [];
+    Array.from(firstRow.querySelectorAll('td')).forEach((cell, index) => {
+      const rect = cell.getBoundingClientRect();
+      if (index === 0) columns.push(logicalStart(rect, rtl));
+      columns.push(logicalEnd(rect, rtl));
+    });
+    return { rows, columns };
   }
 
   setSelected(

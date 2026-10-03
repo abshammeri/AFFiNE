@@ -39,6 +39,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import { colorList } from './color';
 import { ColumnMaxWidth, DefaultColumnWidth } from './consts';
+import { getTableDirectionOptions, isRtlElement } from './direction';
 import type { SelectionController } from './selection-controller';
 import {
   type TableAreaSelection,
@@ -173,38 +174,10 @@ export class TableCell extends SignalWatcher(
             ],
           }),
           menu.group({
-            items: [
-              menu.action({
-                name: 'Insert Left',
-                prefix: InsertLeftIcon(),
-                select: () => {
-                  this.dataManager.insertColumn(
-                    columnIndex > 0 ? columnIndex - 1 : undefined
-                  );
-                },
-              }),
-              menu.action({
-                name: 'Insert Right',
-                prefix: InsertRightIcon(),
-                select: () => {
-                  this.dataManager.insertColumn(columnIndex);
-                },
-              }),
-              menu.action({
-                name: 'Move Left',
-                prefix: ArrowLeftBigIcon(),
-                select: () => {
-                  this.dataManager.moveColumn(columnIndex, columnIndex - 2);
-                },
-              }),
-              menu.action({
-                name: 'Move Right',
-                prefix: ArrowRightBigIcon(),
-                select: () => {
-                  this.dataManager.moveColumn(columnIndex, columnIndex + 1);
-                },
-              }),
-            ],
+            items: this.columnPositionActions(columnIndex),
+          }),
+          menu.group({
+            items: [this.tableDirectionMenu()],
           }),
           menu.group({
             items: [
@@ -239,6 +212,67 @@ export class TableCell extends SignalWatcher(
         ],
       },
     });
+  }
+
+  /** "Table direction" submenu, shared by the row and column menus. */
+  private tableDirectionMenu() {
+    const options = getTableDirectionOptions(this.dataManager.textDirection);
+    const active = options.find(option => option.selected);
+    return menu.subMenu({
+      name: 'Table direction',
+      prefix: active?.icon,
+      options: {
+        items: options.map(option =>
+          menu.action({
+            name: option.label,
+            prefix: option.icon,
+            isSelected: option.selected,
+            select: () => {
+              this.dataManager.setTextDirection(option.textDirection);
+            },
+          })
+        ),
+      },
+    });
+  }
+
+  /**
+   * Insert / move actions of a column, labelled by what the user sees: in a
+   * right-to-left table the column before this one is on its right.
+   */
+  private columnPositionActions(columnIndex: number) {
+    const insertBefore = () =>
+      this.dataManager.insertColumn(
+        columnIndex > 0 ? columnIndex - 1 : undefined
+      );
+    const insertAfter = () => this.dataManager.insertColumn(columnIndex);
+    const moveBefore = () =>
+      this.dataManager.moveColumn(columnIndex, columnIndex - 2);
+    const moveAfter = () =>
+      this.dataManager.moveColumn(columnIndex, columnIndex + 1);
+    const rtl = isRtlElement(this);
+    return [
+      menu.action({
+        name: 'Insert Left',
+        prefix: InsertLeftIcon(),
+        select: rtl ? insertAfter : insertBefore,
+      }),
+      menu.action({
+        name: 'Insert Right',
+        prefix: InsertRightIcon(),
+        select: rtl ? insertBefore : insertAfter,
+      }),
+      menu.action({
+        name: 'Move Left',
+        prefix: ArrowLeftBigIcon(),
+        select: rtl ? moveAfter : moveBefore,
+      }),
+      menu.action({
+        name: 'Move Right',
+        prefix: ArrowRightBigIcon(),
+        select: rtl ? moveBefore : moveAfter,
+      }),
+    ];
   }
 
   openRowOptions(target: PopupTarget, row: TableRow, rowIndex: number) {
@@ -331,6 +365,9 @@ export class TableCell extends SignalWatcher(
                 },
               }),
             ],
+          }),
+          menu.group({
+            items: [this.tableDirectionMenu()],
           }),
           menu.group({
             items: [
@@ -573,14 +610,17 @@ export class TableCell extends SignalWatcher(
     const isLastColumn =
       columnIndex === this.dataManager.uiColumns$.value.length - 1;
     const showIndicator = this.showRowIndicator$.value;
+    // Logical corners, so the rounded ends follow the column order in a
+    // right-to-left table.
+    const startRadius = isFirstColumn ? '3px' : '0';
+    const endRadius = isLastColumn && !isFirstColumn ? '3px' : '0';
     const style = (show: boolean) =>
       styleMap({
         opacity: show ? 1 : 0,
-        borderRadius: isFirstColumn
-          ? '3px 0 0 3px'
-          : isLastColumn
-            ? '0 3px 3px 0'
-            : '0',
+        borderStartStartRadius: startRadius,
+        borderEndStartRadius: startRadius,
+        borderStartEndRadius: endRadius,
+        borderEndEndRadius: endRadius,
       });
     const indicator0 =
       this.rowIndex === 0
@@ -781,8 +821,9 @@ export class TableCell extends SignalWatcher(
   }
 }
 
-export const createColumnDragPreview = (cells: TableCell[]) => {
+export const createColumnDragPreview = (cells: TableCell[], rtl = false) => {
   const container = document.createElement('div');
+  if (rtl) container.dir = 'rtl';
   container.style.position = 'absolute';
   container.style.opacity = '0.8';
   container.style.display = 'flex';
@@ -814,8 +855,10 @@ export const createColumnDragPreview = (cells: TableCell[]) => {
   return container;
 };
 
-export const createRowDragPreview = (cells: TableCell[]) => {
+export const createRowDragPreview = (cells: TableCell[], rtl = false) => {
   const container = document.createElement('div');
+  // `dir` lays the cells out in the same order as the table row.
+  if (rtl) container.dir = 'rtl';
   container.style.position = 'absolute';
   container.style.opacity = '0.8';
   container.style.display = 'flex';
@@ -827,7 +870,7 @@ export const createRowDragPreview = (cells: TableCell[]) => {
     const div = document.createElement('div');
     const td = cell.querySelector('td');
     if (index !== 0) {
-      div.style.borderLeft = `1px solid ${cssVarV2.layer.insideBorder.border}`;
+      div.style.borderInlineStart = `1px solid ${cssVarV2.layer.insideBorder.border}`;
     }
     if (td) {
       div.style.width = `${td.getBoundingClientRect().width}px`;

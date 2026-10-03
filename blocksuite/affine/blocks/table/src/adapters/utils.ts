@@ -191,7 +191,21 @@ export const parseTableFromHtml = (
     });
     rowTextLists.push(row);
   });
-  return createTableProps(rowTextLists);
+  const props = createTableProps(rowTextLists);
+  const textDirection = getHtmlTextDirection(element);
+  return textDirection ? { ...props, textDirection } : props;
+};
+
+const HTML_TEXT_DIRECTIONS = new Set<string>(['ltr', 'rtl', 'auto']);
+
+/** The table's `dir` attribute, when it is one the table block supports. */
+const getHtmlTextDirection = (element: Element) => {
+  const dir = element.properties?.dir;
+  if (typeof dir !== 'string') return undefined;
+  const value = dir.toLowerCase();
+  return HTML_TEXT_DIRECTIONS.has(value)
+    ? (value as TableBlockPropsSerialized['textDirection'])
+    : undefined;
 };
 
 export const parseTableFromMarkdown = (

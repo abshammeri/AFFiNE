@@ -60,7 +60,7 @@ export const tableBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
   fromBlockSnapshot: {
     enter: (o, context) => {
       const { walkerContext } = context;
-      const { columns, rows, cells } = o.node
+      const { columns, rows, cells, textDirection } = o.node
         .props as unknown as TableBlockPropsSerialized;
       const table = processTable(columns, rows, cells);
       const createAstTableCell = (
@@ -114,6 +114,7 @@ export const tableBlockHtmlAdapterMatcher: BlockHtmlAdapterMatcher = {
           properties: {
             border: true,
             style: 'border-collapse: collapse;border-spacing: 0;',
+            ...(textDirection ? { dir: textDirection } : {}),
           },
           children: [tableBodyAst],
         })
