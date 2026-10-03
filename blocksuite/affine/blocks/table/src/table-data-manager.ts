@@ -1,13 +1,38 @@
-import type { TableBlockModel, TableCell } from '@blocksuite/affine-model';
-import { generateFractionalIndexingKeyBetween } from '@blocksuite/affine-shared/utils';
+import type {
+  TableBlockModel,
+  TableCell,
+  TextDirection,
+} from '@blocksuite/affine-model';
+import {
+  type EditorTextDirection,
+  generateFractionalIndexingKeyBetween,
+} from '@blocksuite/affine-shared/utils';
 import { nanoid, Text } from '@blocksuite/store';
 import { computed, type ReadonlySignal, signal } from '@preact/signals-core';
 
+import {
+  resolveTableDirection,
+  setTableTextDirection,
+  type TableLayoutDirection,
+} from './direction';
 import type { TableAreaSelection } from './selection-schema';
 import { compareByOrder } from './utils';
 
 export class TableDataManager {
-  constructor(private readonly model: TableBlockModel) {}
+  constructor(
+    private readonly model: TableBlockModel,
+    private readonly getGlobalTextDirection: () =>
+      | EditorTextDirection
+      | undefined = () => undefined
+  ) {}
+  /**
+   * The direction the table is rendered with (`dir` on the table), see
+   * `resolveTableDirection`. Reactive to the table's own `textDirection`, the
+   * editor-wide setting and, for `auto`, the cell text.
+   */
+  readonly direction$: ReadonlySignal<TableLayoutDirection> = computed(() =>
+    resolveTableDirection(this.model, this.getGlobalTextDirection())
+  );
   readonly readonly$: ReadonlySignal<boolean> = computed(() => {
     return this.model.store.readonly;
   });
@@ -72,6 +97,15 @@ export class TableDataManager {
     }
     return columns.slice(0, columns.length + virtualColumnCount);
   });
+
+  /** The table's own direction; `undefined` follows the editor setting. */
+  get textDirection(): TextDirection | undefined {
+    return this.model.props.textDirection;
+  }
+
+  setTextDirection(textDirection: TextDirection | null) {
+    setTableTextDirection(this.model, textDirection);
+  }
 
   getCell(rowId: string, columnId: string): TableCell | undefined {
     return this.model.props.cells$.value[`${rowId}:${columnId}`];

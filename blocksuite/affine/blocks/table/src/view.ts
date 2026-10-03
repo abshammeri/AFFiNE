@@ -8,6 +8,7 @@ import { BlockViewExtension, FlavourExtension } from '@blocksuite/std';
 import { literal } from 'lit/static-html.js';
 
 import { tableSlashMenuConfig } from './configs/slash-menu';
+import { TableToolbarExtension } from './configs/toolbar';
 import { effects } from './effects';
 import { TableKeymapExtension } from './table-keymap.js';
 
@@ -26,6 +27,7 @@ export class TableViewExtension extends ViewExtensionProvider {
       TableKeymapExtension,
       BlockViewExtension(TableModelFlavour, literal`affine-table`),
       SlashMenuConfigExtension(TableModelFlavour, tableSlashMenuConfig),
+      TableToolbarExtension,
     ]);
   }
 }

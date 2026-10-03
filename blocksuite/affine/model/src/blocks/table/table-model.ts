@@ -5,7 +5,7 @@ import {
   defineBlockSchema,
 } from '@blocksuite/store';
 
-import type { TextAlign } from '../../consts';
+import type { TextAlign, TextDirection } from '../../consts';
 import type { BlockMeta } from '../../utils/types';
 
 export type TableCell = {
@@ -32,6 +32,12 @@ export interface TableBlockProps extends BlockMeta {
   cells: Record<string, TableCell>;
   comments?: Record<string, boolean>;
   textAlign?: TextAlign;
+  /**
+   * Writing direction of the whole table: `rtl` lays the columns out right to
+   * left (first column on the right). `undefined` inherits the editor-wide
+   * direction.
+   */
+  textDirection?: TextDirection;
 }
 
 export interface TableCellSerialized {
@@ -44,6 +50,7 @@ export interface TableBlockPropsSerialized {
   rows: Record<string, TableRow>;
   columns: Record<string, TableColumn>;
   cells: Record<string, TableCellSerialized>;
+  textDirection?: TextDirection;
 }
 
 export class TableBlockModel extends BlockModel<TableBlockProps> {}
@@ -56,6 +63,7 @@ export const TableBlockSchema = defineBlockSchema({
     cells: {},
     comments: undefined,
     textAlign: undefined,
+    textDirection: undefined,
     'meta:createdAt': undefined,
     'meta:createdBy': undefined,
     'meta:updatedAt': undefined,

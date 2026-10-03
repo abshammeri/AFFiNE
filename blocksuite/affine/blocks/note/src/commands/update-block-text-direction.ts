@@ -12,7 +12,12 @@ export const TEXT_DIRECTION_FLAVOURS = new Set([
   'affine:paragraph',
   'affine:list',
   'affine:callout',
+  // The whole table: cells are not blocks, they follow the table's direction.
+  'affine:table',
 ]);
+
+/** `TableSelection.type`, the selection of cells inside a table block. */
+const TABLE_SELECTION_TYPE = 'table';
 
 type UpdateBlockTextDirectionConfig = {
   /** `null` removes the block's own direction so it inherits the editor's. */
@@ -48,9 +53,20 @@ export const updateBlockTextDirection: Command<
     }
   }
 
-  const models = (selectedModels ?? []).filter(model =>
+  let models = (selectedModels ?? []).filter(model =>
     TEXT_DIRECTION_FLAVOURS.has(model.flavour)
   );
+  if (models.length === 0 && !ctx.selectedModels) {
+    // The caret (or a cell range) is inside a table: cells are not blocks and
+    // have no direction of their own, so the command targets the table.
+    models = std.selection.value
+      .filter(selection => selection.type === TABLE_SELECTION_TYPE)
+      .map(selection => std.store.getBlock(selection.blockId)?.model)
+      .filter(
+        (model): model is BlockModel =>
+          !!model && TEXT_DIRECTION_FLAVOURS.has(model.flavour)
+      );
+  }
   if (models.length === 0) return false;
 
   std.store.captureSync();

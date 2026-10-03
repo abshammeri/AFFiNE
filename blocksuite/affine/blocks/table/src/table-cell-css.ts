@@ -81,7 +81,7 @@ export const columnOptionsStyle = css({
 export const rowOptionsCellStyle = css({
   position: 'absolute',
   top: '0',
-  left: '0',
+  insetInlineStart: '0',
   width: '0',
   height: '100%',
   display: 'flex',
@@ -149,7 +149,7 @@ export const columnRightIndicatorStyle = css([
   columnIndicatorStyle,
   {
     cursor: 'ew-resize',
-    right: '-3px',
+    insetInlineEnd: '-3px',
     pointerEvents: 'auto',
   },
 ]);
@@ -157,14 +157,14 @@ export const columnRightIndicatorStyle = css([
 export const columnLeftIndicatorStyle = css([
   columnIndicatorStyle,
   {
-    left: '-2px',
+    insetInlineStart: '-2px',
   },
 ]);
 
 export const rowIndicatorStyle = css([
   indicatorStyle,
   {
-    left: '-1px',
+    insetInlineStart: '-1px',
     width: 'calc(100% + 2px)',
     height: '5px',
   },

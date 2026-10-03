@@ -22,6 +22,7 @@ import {
   cellCountTipsStyle,
 } from './add-button-css';
 import { DefaultColumnWidth, DefaultRowHeight } from './consts';
+import { isRtlElement } from './direction';
 import type { TableDataManager } from './table-data-manager';
 
 export const AddButtonComponentName = 'affine-table-add-button';
@@ -151,6 +152,9 @@ export class AddButton extends SignalWatcher(
       return;
     }
     const tipsHandler = this.popCellCountTips(realTarget);
+    // Columns are added on the inline-end side: to the left of a
+    // right-to-left table, so dragging left adds columns there.
+    const xSign = isRtlElement(realTarget) ? -1 : 1;
     let emptyRows: number[] = [];
     let emptyColumns: number[] = [];
     if (isColumn) {
@@ -167,7 +171,7 @@ export class AddButton extends SignalWatcher(
       emptyColumns = this.getEmptyColumns();
     }
     const onMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - initialX;
+      const deltaX = (e.clientX - initialX) * xSign;
       const deltaY = e.clientY - initialY;
       const addColumn = isColumn || isRowColumn;
       const addRow = isRow || isRowColumn;

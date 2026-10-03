@@ -1,7 +1,10 @@
 import { CaptionedBlockComponent } from '@blocksuite/affine-components/caption';
 import type { TableBlockModel } from '@blocksuite/affine-model';
 import { EDGELESS_TOP_CONTENTEDITABLE_SELECTOR } from '@blocksuite/affine-shared/consts';
-import { DocModeProvider } from '@blocksuite/affine-shared/services';
+import {
+  DocModeProvider,
+  getGlobalTextDirection,
+} from '@blocksuite/affine-shared/services';
 import { VirtualPaddingController } from '@blocksuite/affine-shared/utils';
 import { IS_MOBILE } from '@blocksuite/global/env';
 import type { BlockComponent } from '@blocksuite/std';
@@ -11,10 +14,12 @@ import {
 } from '@blocksuite/std/inline';
 import { signal } from '@preact/signals-core';
 import { html, nothing } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { ref } from 'lit/directives/ref.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import { isRtlElement } from './direction';
 import { SelectionController } from './selection-controller';
 import {
   rowStyle,
@@ -30,7 +35,9 @@ export class TableBlockComponent extends CaptionedBlockComponent<TableBlockModel
 
   get dataManager(): TableDataManager {
     if (!this._dataManager) {
-      this._dataManager = new TableDataManager(this.model);
+      this._dataManager = new TableDataManager(this.model, () =>
+        getGlobalTextDirection(this.std)
+      );
     }
     return this._dataManager;
   }
@@ -130,6 +137,15 @@ export class TableBlockComponent extends CaptionedBlockComponent<TableBlockModel
 
   table$ = signal<HTMLTableElement>();
 
+  /**
+   * Whether the table is actually laid out right to left (its own direction,
+   * the editor setting, or inherited from the page). Pointer math that works
+   * with physical x coordinates mirrors itself when this is true.
+   */
+  isRtl(): boolean {
+    return isRtlElement(this.table$.value);
+  }
+
   public getScale(): number {
     const table = this.table$.value;
     if (!table) return 1;
@@ -193,11 +209,15 @@ export class TableBlockComponent extends CaptionedBlockComponent<TableBlockModel
     const startRect = startCell.getBoundingClientRect();
     const endRect = endCell.getBoundingClientRect();
     const scale = this.getScale();
+    // In a right-to-left table the start column is on the right, so take the
+    // horizontal extent from both cells instead of assuming start = left.
+    const left = Math.min(startRect.left, endRect.left);
+    const right = Math.max(startRect.right, endRect.right);
 
     return {
       top: (startRect.top - rootRect.top) / scale,
-      left: (startRect.left - rootRect.left) / scale,
-      width: (endRect.right - startRect.left) / scale,
+      left: (left - rootRect.left) / scale,
+      width: (right - left) / scale,
       height: (endRect.bottom - startRect.top) / scale,
     };
   };
@@ -206,13 +226,18 @@ export class TableBlockComponent extends CaptionedBlockComponent<TableBlockModel
     const rows = this.dataManager.uiRows$.value;
     const columns = this.dataManager.uiColumns$.value;
     const virtualPadding = this.virtualPaddingController.virtualPadding$.value;
+    const dir = this.dataManager.direction$.value;
+    // `dir` goes on the scroll container too: it mirrors the extra room kept
+    // for the row handles (inline-start side), the horizontal scroll origin
+    // and the default alignment of the table, not only the column order.
     return html`
       <div
         contenteditable="false"
         class=${tableContainer}
+        dir=${ifDefined(dir)}
         style=${styleMap({
-          marginLeft: `-${virtualPadding + 10}px`,
-          marginRight: `-${virtualPadding}px`,
+          marginInlineStart: `-${virtualPadding + 10}px`,
+          marginInlineEnd: `-${virtualPadding}px`,
           position: 'relative',
         })}
       >
@@ -233,7 +258,11 @@ export class TableBlockComponent extends CaptionedBlockComponent<TableBlockModel
             width: 'max-content',
           })}
         >
-          <table class=${tableWrapper} ${ref(this.table$)}>
+          <table
+            class=${tableWrapper}
+            dir=${ifDefined(dir)}
+            ${ref(this.table$)}
+          >
             <tbody class=${table}>
               ${repeat(
                 rows,
