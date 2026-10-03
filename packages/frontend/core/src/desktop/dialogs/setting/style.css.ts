@@ -17,7 +17,7 @@ export const content = style({
   width: '100%',
   marginBottom: '24px',
   minHeight: 'calc(var(--setting-modal-height) - 124px)',
-  maxWidth: '560px',
+  maxWidth: '700px',
 });
 export const suggestionLink = style({
   fontSize: cssVar('fontSm'),
@@ -41,7 +41,7 @@ export const footer = style({
   gap: '4px',
   fontSize: cssVar('fontXs'),
   flexWrap: 'wrap',
-  maxWidth: '560px',
+  maxWidth: '700px',
 });
 
 export const link = style({

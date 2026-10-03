@@ -4,7 +4,9 @@ import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 
+import { filterTraitKey } from '../../core/filter/trait.js';
 import { type DataViewInstance, renderUniLit } from '../../core/index.js';
+import { sortTraitKey } from '../../core/sort/manager.js';
 import type { SingleView } from '../../core/view-manager/single-view.js';
 import type { ViewManager } from '../../core/view-manager/view-manager.js';
 import type { DataViewWidget } from '../../core/widget/types.js';
@@ -43,9 +45,17 @@ const styles = css`
 export class DataViewHeaderTools extends WidgetBase {
   static override styles = styles;
 
+  private get hasActiveFilterOrSort() {
+    const hasFilter =
+      this.view.traitGet(filterTraitKey)?.hasFilter$.value ?? false;
+    const hasSort = this.view.traitGet(sortTraitKey)?.hasSort$.value ?? false;
+    return hasFilter || hasSort;
+  }
+
   override render() {
     const classList = classMap({
-      'show-toolbar': IS_MOBILE,
+      // keep the toolbar visible while the view is filtered or sorted
+      'show-toolbar': IS_MOBILE || this.hasActiveFilterOrSort,
       'affine-database-toolbar': true,
     });
     const tools = this.toolsMap[this.view.type];

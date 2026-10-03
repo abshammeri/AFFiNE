@@ -2,7 +2,7 @@ import {
   insertPositionToIndex,
   type InsertToPosition,
 } from '@blocksuite/affine-shared/utils';
-import { computed, type ReadonlySignal } from '@preact/signals-core';
+import { computed, type ReadonlySignal, signal } from '@preact/signals-core';
 
 import { evalFilter } from '../../core/filter/eval.js';
 import { generateDefaultValues } from '../../core/filter/generate-default-values.js';
@@ -363,6 +363,14 @@ export class TableSingleView extends SingleViewBase<TableViewData> {
 
 type TableColumnData = TableViewData['columns'][number];
 
+/**
+ * Column width while the user is dragging the resize handle,
+ * committed to the model only once on drop.
+ */
+const columnWidthDraft$ = signal<
+  { viewId: string; columnId: string; width: number } | undefined
+>(undefined);
+
 export class TableProperty extends PropertyBase {
   override hideSet(hide: boolean): void {
     this.viewDataUpdate(data => {
@@ -408,6 +416,14 @@ export class TableProperty extends PropertyBase {
   });
 
   width$: ReadonlySignal<number> = computed(() => {
+    const draft = columnWidthDraft$.value;
+    if (
+      draft &&
+      draft.viewId === this.tableView.id &&
+      draft.columnId === this.id
+    ) {
+      return draft.width;
+    }
     const column = this.viewData$.value;
     if (column?.width != null) {
       return column.width;
@@ -454,6 +470,17 @@ export class TableProperty extends PropertyBase {
         statCalcType: type,
       };
     });
+  }
+
+  /**
+   * Preview a column width without writing it to the model,
+   * pass `undefined` to clear the preview.
+   */
+  updateWidthDraft(width: number | undefined): void {
+    columnWidthDraft$.value =
+      width == null
+        ? undefined
+        : { viewId: this.tableView.id, columnId: this.id, width };
   }
 
   updateWidth(width: number): void {

@@ -21,6 +21,16 @@ export const docIconPickerTrigger = style({
 
 export const placeholder = style({
   padding: '4px',
+  // only reveal the placeholder when hovering the title area,
+  // keep it reachable by keyboard
+  opacity: 0,
+  transition: 'opacity 0.2s ease',
+  selectors: {
+    '.doc-icon-container:hover &, .doc-icon-container:has(+ :hover) &, .doc-icon-container:focus-within &, &:focus-visible, &[data-state="open"]':
+      {
+        opacity: 1,
+      },
+  },
 });
 export const placeholderContent = style({
   display: 'flex',

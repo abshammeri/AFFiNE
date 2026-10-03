@@ -29,6 +29,8 @@ export const listViewRoot = style({
   alignItems: 'center',
   gap: 8,
   borderRadius: 4,
+  // rows are packed without gap, keep them visually separated
+  boxShadow: `inset 0 -0.5px 0 ${cssVarV2.layer.insideBorder.border}`,
   overflow: 'hidden',
   containerName: 'list-view-root',
   containerType: 'size',
@@ -132,7 +134,7 @@ export const listTitle = style([
   ellipsis,
   {
     fontSize: 14,
-    lineHeight: '22px',
+    lineHeight: '20px',
     fontWeight: 500,
     color: cssVarV2.text.primary,
   },
@@ -141,7 +143,7 @@ export const listPreview = style([
   ellipsis,
   {
     fontSize: 12,
-    lineHeight: '20px',
+    lineHeight: '16px',
     fontWeight: 400,
     color: cssVarV2.text.secondary,
   },
