@@ -49,11 +49,11 @@ export async function pasteString(page: Page, data: string) {
 
 export async function selectCell(page: Page, nth: number, editing = true) {
   const firstCell = page.locator('dv-table-view-cell-container').nth(nth);
-  // First click for focus
+  // A single click selects the cell and enters edit mode
   await firstCell.click({ delay: 100 });
-  // Second click for edit mode
-  if (editing) {
-    await firstCell.click({ delay: 100 });
+  // Leave edit mode but keep the cell selected
+  if (!editing) {
+    await page.keyboard.press('Escape');
   }
   return firstCell;
 }

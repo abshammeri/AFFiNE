@@ -96,13 +96,17 @@ export class KanbanCell extends SignalWatcher(
   override connectedCallback() {
     super.connectedCallback();
     this._disposables.addFromEvent(this, 'click', e => {
-      if (e.shiftKey) {
+      // Let modifier clicks (card multi-select) and clicks on read-only
+      // cells bubble up to the card, which opens the card detail.
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        return;
+      }
+      if (this.column.readonly$.value) {
         return;
       }
       e.stopPropagation();
       const selectionElement = this.kanbanViewLogic.selectionController;
       if (!selectionElement) return;
-      if (e.shiftKey) return;
 
       if (!this.isEditing$.value) {
         this.selectCurrentCell(!this.column.readonly$.value);

@@ -9,6 +9,7 @@ import type {
   CellRenderProps,
   DataViewCellLifeCycle,
 } from '../../../core/property/index.js';
+import { isLinkClick } from '../../../core/utils/event.js';
 import {
   TableViewAreaSelection,
   type TableViewSelectionWithType,
@@ -69,27 +70,28 @@ export class TableViewCellContainer extends SignalWatcher(
     const selectionView = this.selectionController;
     if (selectionView) {
       const selection = selectionView.selection;
+      if (
+        editing &&
+        selection?.selectionType === 'area' &&
+        selection.isEditing &&
+        this.isSelected(selection)
+      ) {
+        // Already editing this cell.
+        return;
+      }
+      // Enter edit mode directly (Notion-like single click editing). Cells
+      // that are not editable inline (e.g. checkbox) handle the click in
+      // `beforeEnterEditMode` and return false, so they only get selected.
       const shouldEnterEditMode =
         editing && this.cell?.beforeEnterEditMode() !== false;
-      if (selection && this.isSelected(selection) && shouldEnterEditMode) {
-        selectionView.selection = TableViewAreaSelection.create({
-          groupKey: this.groupKey,
-          focus: {
-            rowIndex: this.rowIndex,
-            columnIndex: this.columnIndex,
-          },
-          isEditing: true,
-        });
-      } else {
-        selectionView.selection = TableViewAreaSelection.create({
-          groupKey: this.groupKey,
-          focus: {
-            rowIndex: this.rowIndex,
-            columnIndex: this.columnIndex,
-          },
-          isEditing: false,
-        });
-      }
+      selectionView.selection = TableViewAreaSelection.create({
+        groupKey: this.groupKey,
+        focus: {
+          rowIndex: this.rowIndex,
+          columnIndex: this.columnIndex,
+        },
+        isEditing: shouldEnterEditMode,
+      });
     }
   };
 
@@ -107,9 +109,9 @@ export class TableViewCellContainer extends SignalWatcher(
 
   override connectedCallback() {
     super.connectedCallback();
-    this._disposables.addFromEvent(this, 'click', () => {
+    this._disposables.addFromEvent(this, 'click', e => {
       if (!this.isEditing$.value) {
-        this.selectCurrentCell(!this.column.readonly$.value);
+        this.selectCurrentCell(!this.column.readonly$.value && !isLinkClick(e));
       }
     });
   }

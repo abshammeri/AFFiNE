@@ -142,11 +142,11 @@ export class TableHotkeysController implements ReactiveController {
                 });
             }
           } else if (selection.isEditing) {
+            // Commit the edit and keep the same cell selected (Notion-like).
             this.selectionController.selection = {
               ...selection,
               isEditing: false,
             };
-            this.selectionController.focusToCell('down');
           } else {
             this.selectionController.selection = {
               ...selection,

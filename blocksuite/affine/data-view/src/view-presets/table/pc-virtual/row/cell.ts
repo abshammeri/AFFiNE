@@ -10,6 +10,7 @@ import type {
   CellRenderProps,
   DataViewCellLifeCycle,
 } from '../../../../core/property';
+import { isLinkClick } from '../../../../core/utils/event.js';
 import {
   TableViewAreaSelection,
   TableViewRowSelection,
@@ -54,27 +55,28 @@ export class DatabaseCellContainer extends SignalWatcher(
     const selectionView = this.selectionView;
     if (selectionView) {
       const selection = selectionView.selection;
+      if (
+        editing &&
+        selection?.selectionType === 'area' &&
+        selection.isEditing &&
+        this.isSelected(selection)
+      ) {
+        // Already editing this cell.
+        return;
+      }
+      // Enter edit mode directly (Notion-like single click editing). Cells
+      // that are not editable inline (e.g. checkbox) handle the click in
+      // `beforeEnterEditMode` and return false, so they only get selected.
       const shouldEnterEditMode =
         editing && this.cell?.beforeEnterEditMode() !== false;
-      if (selection && this.isSelected(selection) && shouldEnterEditMode) {
-        selectionView.selection = TableViewAreaSelection.create({
-          groupKey: this.groupKey,
-          focus: {
-            rowIndex: this.rowIndex$.value,
-            columnIndex: this.columnIndex$.value,
-          },
-          isEditing: true,
-        });
-      } else {
-        selectionView.selection = TableViewAreaSelection.create({
-          groupKey: this.groupKey,
-          focus: {
-            rowIndex: this.rowIndex$.value,
-            columnIndex: this.columnIndex$.value,
-          },
-          isEditing: false,
-        });
-      }
+      selectionView.selection = TableViewAreaSelection.create({
+        groupKey: this.groupKey,
+        focus: {
+          rowIndex: this.rowIndex$.value,
+          columnIndex: this.columnIndex$.value,
+        },
+        isEditing: shouldEnterEditMode,
+      });
     }
   };
 
@@ -111,9 +113,11 @@ export class DatabaseCellContainer extends SignalWatcher(
   override connectedCallback() {
     super.connectedCallback();
     this.disposables.addFromEvent(this, 'contextmenu', this.contextMenu);
-    this.disposables.addFromEvent(this.parentElement, 'click', () => {
+    this.disposables.addFromEvent(this.parentElement, 'click', e => {
       if (!this.isEditing$.value) {
-        this.selectCurrentCell(!this.column$.value?.readonly$.value);
+        this.selectCurrentCell(
+          !this.column$.value?.readonly$.value && !isLinkClick(e)
+        );
       }
     });
     this.disposables.addFromEvent(this.parentElement, 'mouseenter', () => {
