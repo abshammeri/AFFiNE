@@ -2,7 +2,7 @@ import { useThemeColorV2 } from '@affine/component';
 import { PageDetailLoading } from '@affine/component/page-detail-skeleton';
 import type { AffineEditorContainer } from '@affine/core/blocksuite/block-suite-editor';
 import { AffineErrorBoundary } from '@affine/core/components/affine/affine-error-boundary';
-import { useGuard } from '@affine/core/components/guard';
+import { useDocReadAccess, useGuard } from '@affine/core/components/guard';
 import { useActiveBlocksuiteEditor } from '@affine/core/components/hooks/use-block-suite-editor';
 import { useNavigateHelper } from '@affine/core/components/hooks/use-navigate-helper';
 import { PageDetailEditor } from '@affine/core/components/page-detail-editor';
@@ -535,7 +535,7 @@ const MobileDetailPage = ({
   const workbench = useService(WorkbenchService).workbench;
   const title = useLiveData(docDisplayMetaService.title$(pageId));
 
-  const canAccess = useGuard('Doc_Read', pageId);
+  const canAccess = useDocReadAccess(pageId);
 
   const allJournalDates = useLiveData(journalService.allJournalDates$);
 

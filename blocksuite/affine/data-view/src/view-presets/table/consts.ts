@@ -8,3 +8,8 @@ export const DEFAULT_COLUMN_TITLE_HEIGHT = 34;
 export const DEFAULT_ADD_BUTTON_WIDTH = 40;
 export const LEFT_TOOL_BAR_WIDTH = 24;
 export const STATS_BAR_HEIGHT = 34;
+/**
+ * Tables with at least this many rows use the virtualized renderer by
+ * default (see `shouldUseVirtualTable`).
+ */
+export const TABLE_VIRTUAL_SCROLL_ROW_THRESHOLD = 100;

@@ -1,4 +1,4 @@
-export const ADD_BLOCK_WIDGET_WIDTH = 16;
+export const ADD_BLOCK_WIDGET_WIDTH = 20;
 export const DRAG_HANDLE_CONTAINER_HEIGHT = 24;
 export const DRAG_HANDLE_CONTAINER_WIDTH = 16;
 export const DRAG_HANDLE_CONTAINER_WIDTH_TOP_LEVEL = 8;
@@ -12,6 +12,11 @@ export const DRAG_HANDLE_GRABBER_WIDTH = 4;
 export const DRAG_HANDLE_GRABBER_WIDTH_HOVERED = 2;
 export const DRAG_HANDLE_GRABBER_BORDER_RADIUS = 4;
 export const DRAG_HANDLE_GRABBER_MARGIN = 4;
+
+// Notion-style 6-dot grip used for blocks in page mode
+export const DRAG_HANDLE_GRIP_WIDTH = 18;
+export const DRAG_HANDLE_GRIP_HEIGHT = 24;
+export const DRAG_HANDLE_FADE_IN_DURATION = 120;
 
 export const HOVER_AREA_RECT_PADDING_TOP_LEVEL = 6;
 

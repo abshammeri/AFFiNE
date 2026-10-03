@@ -1,5 +1,4 @@
 import { ServerFeature } from '@affine/graphql';
-import { SearchIcon } from '@blocksuite/icons/rc';
 import {
   effect,
   Entity,
@@ -8,13 +7,23 @@ import {
   onStart,
 } from '@toeverything/infra';
 import { truncate } from 'lodash-es';
-import { catchError, EMPTY, map, of, switchMap, tap, throttleTime } from 'rxjs';
+import {
+  catchError,
+  EMPTY,
+  map,
+  merge,
+  type Observable,
+  of,
+  scan,
+  switchMap,
+  tap,
+  throttleTime,
+} from 'rxjs';
 
 import type { WorkspaceServerService } from '../../cloud';
 import type { DocRecord, DocsService } from '../../doc';
 import type { DocDisplayMetaService } from '../../doc-display-meta';
 import type { DocsSearchService } from '../../docs-search';
-import type { FeatureFlagService } from '../../feature-flag';
 import type { WorkspaceService } from '../../workspace';
 import type { QuickSearchSession } from '../providers/quick-search-provider';
 import type { QuickSearchItem } from '../types/item';
@@ -26,6 +35,20 @@ interface DocsPayload {
   blockContent?: string | undefined;
 }
 
+type SearchedDoc = DocsPayload & { score: number };
+
+type SearchResult = {
+  docs: SearchedDoc[];
+  useLocalLabel: boolean;
+  /**
+   * when true, `docs` is already ordered and the score of each item is derived
+   * from its position, so that the list stays stable while results are merged
+   */
+  ranked: boolean;
+  /** false while server results are still pending */
+  settled: boolean;
+};
+
 export class DocsQuickSearchSession
   extends Entity
   implements QuickSearchSession<'docs', DocsPayload>
@@ -35,8 +58,7 @@ export class DocsQuickSearchSession
     private readonly workspaceServerService: WorkspaceServerService,
     private readonly docsSearchService: DocsSearchService,
     private readonly docsService: DocsService,
-    private readonly docDisplayMetaService: DocDisplayMetaService,
-    private readonly featureFlagService: FeatureFlagService
+    private readonly docDisplayMetaService: DocDisplayMetaService
   ) {
     super();
   }
@@ -45,9 +67,6 @@ export class DocsQuickSearchSession
     this.workspaceServerService.server?.config$.value.features.includes(
       ServerFeature.Indexer
     ) ?? false;
-
-  private readonly isEnableBatterySaveMode = () =>
-    this.featureFlagService.flags.enable_battery_save_mode.value;
 
   private readonly isIndexerLoading$ = this.docsSearchService.indexerState$.map(
     ({ completed }) => {
@@ -59,26 +78,6 @@ export class DocsQuickSearchSession
 
   isCloudWorkspace = this.workspaceService.workspace.flavour !== 'local';
 
-  searchLocallyItem = {
-    id: 'search-locally',
-    source: 'docs',
-    label: {
-      title: {
-        i18nKey: 'com.affine.quicksearch.search-locally',
-      },
-    },
-    score: 1000,
-    icon: SearchIcon,
-    payload: {
-      docId: '',
-    },
-    beforeSubmit: () => {
-      this.searchLocally = true;
-      this.query(this.lastQuery);
-      return false;
-    },
-  } as QuickSearchItem<'docs', DocsPayload>;
-
   isLoading$ = LiveData.computed(get => {
     return (
       (this.isCloudWorkspace ? false : get(this.isIndexerLoading$)) ||
@@ -88,71 +87,111 @@ export class DocsQuickSearchSession
 
   error$ = new LiveData<any>(null);
 
-  lastQuery = '';
-
   items$ = new LiveData<QuickSearchItem<'docs', DocsPayload>[]>([]);
 
-  searchLocally = !this.isCloudWorkspace;
+  /**
+   * Search the local index and the server index at the same time.
+   * Local results are emitted as soon as they are available (usually on the first keystroke),
+   * server results are merged in (deduped by docId) when they arrive.
+   * Docs that are already shown keep their position, new docs are appended.
+   */
+  private searchLocalAndRemote$(query: string): Observable<SearchResult> {
+    const local$ = this.docsSearchService.search$(query, 'local').pipe(
+      map(docs => ({ local: docs as SearchedDoc[] })),
+      catchError(err => {
+        console.error('local search failed', err);
+        return of({ local: [] as SearchedDoc[] });
+      })
+    );
+    const remote$ = this.docsSearchService.search$(query, 'remote').pipe(
+      map(docs => ({ remote: docs as SearchedDoc[] })),
+      catchError(err => {
+        console.error('remote search failed', err);
+        return of({ remote: [] as SearchedDoc[] });
+      })
+    );
+
+    return merge(local$, remote$).pipe(
+      scan(
+        (acc, next) => {
+          const local = 'local' in next ? next.local : acc.local;
+          const remote = 'remote' in next ? next.remote : acc.remote;
+
+          // local hit wins over remote hit for the same doc, so that the subtitle does not flicker
+          const byId = new Map<string, SearchedDoc>();
+          for (const doc of [...(local ?? []), ...(remote ?? [])]) {
+            if (!byId.has(doc.docId)) {
+              byId.set(doc.docId, doc);
+            }
+          }
+
+          // keep the order of docs that are already shown, append new ones
+          const order = acc.order.filter(id => byId.has(id));
+          const shown = new Set(order);
+          for (const id of byId.keys()) {
+            if (!shown.has(id)) {
+              order.push(id);
+            }
+          }
+
+          const docs = order
+            .map(id => byId.get(id))
+            .filter((doc): doc is SearchedDoc => !!doc);
+
+          return { local, remote, order, docs };
+        },
+        {
+          local: null as SearchedDoc[] | null,
+          remote: null as SearchedDoc[] | null,
+          order: [] as string[],
+          docs: [] as SearchedDoc[],
+        }
+      ),
+      map(({ docs, remote }) => ({
+        docs,
+        useLocalLabel: false,
+        ranked: true,
+        settled: remote !== null,
+      }))
+    );
+  }
 
   query = effect(
-    tap(query => {
-      this.lastQuery = query;
-    }),
     throttleTime<string>(150, undefined, {
       leading: true,
       trailing: true,
     }),
     switchMap((query: string) => {
-      let out;
+      let out: Observable<{
+        items: QuickSearchItem<'docs', DocsPayload>[];
+        settled: boolean;
+      }>;
       if (!query) {
-        out = of({ items: [], useLocalLabel: false });
+        out = of({ items: [], settled: true });
       } else {
-        const preferRemote =
-          !this.searchLocally && this.isSupportServerIndexer();
-        const preferMode =
-          this.searchLocally || !this.isSupportServerIndexer()
-            ? 'local'
-            : 'remote';
-        const search$ = preferRemote
-          ? this.docsSearchService.search$(query, 'remote').pipe(
-              switchMap(docs => {
-                if (docs.length > 0) {
-                  return of({ docs, useLocalLabel: false });
-                }
-                return this.docsSearchService.search$(query, 'local').pipe(
-                  map(localDocs => ({
-                    docs: localDocs,
-                    useLocalLabel: true,
-                  }))
-                );
-              }),
-              catchError(() =>
-                this.docsSearchService.search$(query, 'local').pipe(
-                  map(localDocs => ({
-                    docs: localDocs,
-                    useLocalLabel: true,
-                  }))
-                )
-              )
-            )
-          : this.docsSearchService.search$(query, preferMode).pipe(
+        const search$: Observable<SearchResult> = this.isSupportServerIndexer()
+          ? this.searchLocalAndRemote$(query)
+          : this.docsSearchService.search$(query, 'local').pipe(
               map(docs => ({
                 docs,
-                useLocalLabel: preferMode === 'local',
+                useLocalLabel: true,
+                ranked: false,
+                settled: true,
               }))
             );
 
         out = search$.pipe(
-          map(({ docs, useLocalLabel }) => {
+          map(({ docs, useLocalLabel, ranked, settled }) => {
             const items = docs
-              .map(doc => {
+              .map((doc, index) => {
                 const docRecord = this.docsService.list.doc$(doc.docId).value;
-                return [doc, docRecord] as const;
+                return [doc, docRecord, index] as const;
               })
               .filter(
-                (props): props is [(typeof props)[0], DocRecord] => !!props[1]
+                (props): props is [(typeof props)[0], DocRecord, number] =>
+                  !!props[1]
               )
-              .map(([doc, docRecord]) => {
+              .map(([doc, docRecord, index]) => {
                 const { title, icon, updatedDate } =
                   this.docDisplayMetaService.getDocDisplayMeta(docRecord);
                 return {
@@ -173,48 +212,29 @@ export class DocsQuickSearchSession
                     title: title,
                     subTitle: doc.blockContent,
                   },
-                  score: doc.score,
+                  // local and server scores are not comparable, use the merged position instead
+                  score: ranked ? docs.length - index : doc.score,
                   icon,
                   timestamp: updatedDate,
                   payload: doc,
                 } as QuickSearchItem<'docs', DocsPayload>;
               });
-            return { items, useLocalLabel };
+            return { items, settled };
           })
         );
       }
       return out.pipe(
-        tap(({ items, useLocalLabel }) => {
-          this.items$.next(
-            this.isSupportServerIndexer() &&
-              !this.searchLocally &&
-              !this.isEnableBatterySaveMode() &&
-              !useLocalLabel
-              ? [...items, this.searchLocallyItem]
-              : items
-          );
-          this.isQueryLoading$.next(false);
+        tap(({ items, settled }) => {
+          this.items$.next(items);
+          this.isQueryLoading$.next(!settled);
         }),
         onStart(() => {
           this.error$.next(null);
-          this.items$.next(
-            this.isSupportServerIndexer() &&
-              !this.searchLocally &&
-              !this.isEnableBatterySaveMode()
-              ? [this.searchLocallyItem]
-              : []
-          );
           this.isQueryLoading$.next(true);
         }),
         catchError(err => {
           this.error$.next(err instanceof Error ? err.message : err);
-          this.items$.next(
-            this.isSupportServerIndexer() &&
-              !this.searchLocally &&
-              !this.isEnableBatterySaveMode()
-              ? [this.searchLocallyItem]
-              : []
-          );
+          this.items$.next([]);
           this.isQueryLoading$.next(false);
           return EMPTY;
         }),

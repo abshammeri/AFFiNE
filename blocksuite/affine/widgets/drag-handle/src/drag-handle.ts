@@ -2,7 +2,7 @@ import './components/add-block-widget.js';
 
 import { EdgelessCRUDIdentifier } from '@blocksuite/affine-block-surface';
 import type { RootBlockModel } from '@blocksuite/affine-model';
-import { focusTextModel } from '@blocksuite/affine-rich-text';
+import { asyncGetRichText, focusTextModel } from '@blocksuite/affine-rich-text';
 import { DocModeProvider } from '@blocksuite/affine-shared/services';
 import {
   isInsideEdgelessEditor,
@@ -31,6 +31,24 @@ import { KeyboardEventWatcher } from './watchers/keyboard-event-watcher.js';
 import { PageWatcher } from './watchers/page-watcher.js';
 import { PointerEventWatcher } from './watchers/pointer-event-watcher.js';
 
+const SLASH_MENU_TRIGGER_KEY = '/';
+
+const dragHandleGripIcon = html`<svg
+  class="grip-icon"
+  width="10"
+  height="16"
+  viewBox="0 0 10 16"
+  fill="currentColor"
+  aria-hidden="true"
+>
+  <circle cx="2.5" cy="3" r="1.5"></circle>
+  <circle cx="7.5" cy="3" r="1.5"></circle>
+  <circle cx="2.5" cy="8" r="1.5"></circle>
+  <circle cx="7.5" cy="8" r="1.5"></circle>
+  <circle cx="2.5" cy="13" r="1.5"></circle>
+  <circle cx="7.5" cy="13" r="1.5"></circle>
+</svg>`;
+
 export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
   static override styles = styles;
 
@@ -56,8 +74,44 @@ export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
   };
 
   /**
-   * Insert a new empty paragraph block below the currently hovered block
-   * and move the cursor into it.
+   * Type the slash menu trigger key into the given (empty) text block so the
+   * slash menu widget opens on it, exactly as if the user had typed "/".
+   */
+  private readonly _openSlashMenuOnBlock = async (blockId: string) => {
+    const richText = await asyncGetRichText(this.std, blockId);
+    const inlineEditor = richText?.inlineEditor;
+    if (!inlineEditor) return;
+
+    // Move focus from the add-block button into the editor (its outermost
+    // contenteditable host), otherwise the inline range is not synced and the
+    // slash menu does not open.
+    let editingHost = inlineEditor.rootElement as HTMLElement | null;
+    while (editingHost?.parentElement?.isContentEditable) {
+      editingHost = editingHost.parentElement;
+    }
+    editingHost?.focus({ preventScroll: true });
+
+    inlineEditor.insertText({ index: 0, length: 0 }, SLASH_MENU_TRIGGER_KEY);
+    inlineEditor.setInlineRange({ index: 1, length: 0 });
+    await inlineEditor.waitForUpdate();
+
+    // The slash menu widget listens to `beforeInput` through the host's event
+    // dispatcher. The event is dispatched on the host (not on the inline
+    // editor root) so the inline editor does not insert the key a second time.
+    this.host.dispatchEvent(
+      new InputEvent('beforeinput', {
+        data: SLASH_MENU_TRIGGER_KEY,
+        inputType: 'insertText',
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      })
+    );
+  };
+
+  /**
+   * Insert a new empty paragraph block below the currently hovered block,
+   * move the cursor into it and open the slash menu.
    */
   private readonly _handleAddBlock = () => {
     const anchorBlockId = this.anchorBlockId.peek();
@@ -85,6 +139,7 @@ export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
     this.host.updateComplete
       .then(() => {
         focusTextModel(this.std, newBlockId);
+        return this._openSlashMenuOnBlock(newBlockId);
       })
       .catch(console.error);
 
@@ -187,6 +242,14 @@ export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
     return this.activeDragHandle === 'gfx';
   }
 
+  /**
+   * Blocks in page mode use a Notion-style 6-dot grip,
+   * edgeless mode keeps the original bar handle.
+   */
+  get isBlockGripMode() {
+    return this.mode === 'page';
+  }
+
   noteScale = signal(1);
 
   pointerEventWatcher = new PointerEventWatcher(this);
@@ -252,9 +315,11 @@ export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
           }
     );
     const isGfx = this.activeDragHandle === 'gfx';
+    const isGrip = this.activeDragHandle === 'block' && this.isBlockGripMode;
     const classes = {
       'affine-drag-handle-grabber': true,
       dots: isGfx ? true : false,
+      grip: isGrip,
     };
 
     return html`
@@ -277,7 +342,9 @@ export class AffineDragHandleWidget extends WidgetComponent<RootBlockModel> {
                     <div class="dot"></div>
                     <div class="dot"></div>
                   `
-                : nothing
+                : isGrip
+                  ? dragHandleGripIcon
+                  : nothing
             }
           </div>
         </div>

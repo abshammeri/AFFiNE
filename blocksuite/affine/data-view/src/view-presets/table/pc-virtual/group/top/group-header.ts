@@ -4,9 +4,10 @@ import {
   popupTargetFromElement,
 } from '@blocksuite/affine-components/context-menu';
 import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
+import { ToggleDownIcon, ToggleRightIcon } from '@blocksuite/icons/lit';
 import { ShadowlessElement } from '@blocksuite/std';
 import { computed } from '@preact/signals-core';
-import { html } from 'lit';
+import { html, nothing } from 'lit';
 import { property } from 'lit/decorators.js';
 
 import { TableViewAreaSelection } from '../../../selection';
@@ -45,6 +46,15 @@ export class TableGroupHeader extends SignalWatcher(
   groupKey$ = computed(() => {
     return this.group$.value?.key;
   });
+
+  collapsed$ = computed(() => {
+    return this.tableViewLogic.groupCollapsed$(this.gridGroup.groupId).value;
+  });
+
+  private readonly toggleCollapse = (e?: Event) => {
+    e?.stopPropagation();
+    this.tableViewLogic.toggleGroupCollapsed(this.gridGroup.groupId);
+  };
 
   get tableViewManager() {
     return this.tableViewLogic.view;
@@ -111,8 +121,28 @@ export class TableGroupHeader extends SignalWatcher(
     }
     return html`
       <div
-        style="position: sticky;left: 0;width: max-content;padding: 6px 0;margin-bottom: 4px;display:flex;align-items:center;gap: 12px;max-width: 400px"
+        style="position: sticky;left: 0;width: max-content;padding: 6px 0;margin-bottom: 4px;display:flex;align-items:center;gap: 8px;max-width: 400px"
       >
+        <div
+          class="${styles.groupToggleButton}"
+          role="button"
+          aria-expanded=${this.collapsed$.value ? 'false' : 'true'}
+          aria-label=${this.collapsed$.value ? 'Expand group' : 'Collapse group'}
+          tabindex="0"
+          @click=${this.toggleCollapse}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              this.toggleCollapse(e);
+            }
+          }}
+        >
+          ${
+            this.collapsed$.value
+              ? ToggleRightIcon({ width: '16px', height: '16px' })
+              : ToggleDownIcon({ width: '16px', height: '16px' })
+          }
+        </div>
         ${GroupTitle(group, {
           groupHover: this.gridGroup.data.headerHover$.value,
           readonly: this.tableViewManager.readonly$.value,
@@ -126,9 +156,14 @@ export class TableGroupHeader extends SignalWatcher(
   override render() {
     return html`
       ${this.renderGroupHeader()}
-      <virtual-table-header
-        .tableViewLogic="${this.tableViewLogic}"
-      ></virtual-table-header>
+      ${
+        this.group$.value && this.collapsed$.value
+          ? nothing
+          : html`<virtual-table-header
+              .tableViewLogic="${this.tableViewLogic}"
+              .gridGroup="${this.gridGroup}"
+            ></virtual-table-header>`
+      }
     `;
   }
 }

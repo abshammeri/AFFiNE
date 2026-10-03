@@ -29,6 +29,7 @@ export class KanbanDragController implements ReactiveController {
       | {
           type: 'self';
           key: string;
+          group: KanbanGroup;
           position: InsertToPosition;
         }
       | undefined,
@@ -56,6 +57,7 @@ export class KanbanDragController implements ReactiveController {
           return {
             type: 'self',
             key: result.group.group.key,
+            group: result.group,
             position: result.position,
           };
         }
@@ -74,6 +76,14 @@ export class KanbanDragController implements ReactiveController {
           result.callback();
           return;
         }
+        if (
+          typeof result.position === 'object' &&
+          result.position.id === ele.cardId &&
+          result.key === currentGroup?.group.key
+        ) {
+          // Dropped next to itself in its own column: nothing to move.
+          return;
+        }
         if (result && currentGroup) {
           currentGroup.group.manager.moveCardTo(
             ele.cardId,
@@ -81,6 +91,8 @@ export class KanbanDragController implements ReactiveController {
             result.key,
             result.position
           );
+          // Make sure the dropped card stays visible in a truncated column.
+          result.group.revealCard(ele.cardId);
         }
       },
     });
@@ -115,6 +127,22 @@ export class KanbanDragController implements ReactiveController {
     const target = eles.find(v => v instanceof KanbanGroup) as KanbanGroup;
     if (target) {
       const card = getCardByPoint(target, evt.y);
+      if (!card && target.isTruncated) {
+        // The column only renders its first cards: dropping below them means
+        // "after the last visible card", not the (hidden) end of the column.
+        const cards = target.querySelectorAll('affine-data-view-kanban-card');
+        const lastCard = cards.item(cards.length - 1);
+        if (lastCard) {
+          return {
+            group: target,
+            card: undefined,
+            position: {
+              before: false,
+              id: lastCard.cardId,
+            },
+          };
+        }
+      }
       return {
         group: target,
         card,
@@ -245,7 +273,9 @@ const createDropPreview = () => {
         rect = card.getBoundingClientRect();
         y = rect.top;
       } else {
-        const addCard = group.querySelector('.add-card');
+        const addCard =
+          group.querySelector('.kanban-show-more') ??
+          group.querySelector('.add-card');
         if (addCard instanceof HTMLElement) {
           rect = addCard.getBoundingClientRect();
           y = rect.top;

@@ -58,3 +58,15 @@ export const addGroup = css({
   position: 'sticky',
   left: `${LEFT_TOOL_BAR_WIDTH}px`,
 });
+
+export const groupsHiddenMessage = css({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  height: '80px',
+  zIndex: 0,
+  color: cssVarV2.text.secondary,
+  fontSize: '14px',
+  textAlign: 'center',
+});

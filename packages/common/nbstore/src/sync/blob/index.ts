@@ -33,6 +33,11 @@ export interface BlobSyncBlobState {
   downloading: boolean;
   errorMessage?: string | null;
   overSize: boolean;
+  /**
+   * Upload progress between 0 and 1 (lowest across uploading peers),
+   * null when not uploading or the progress is unknown.
+   */
+  uploadProgress?: number | null;
 }
 
 export interface BlobSync {
@@ -168,6 +173,13 @@ export class BlobSyncImpl implements BlobSync {
             overSize: peers.some(p => p.overSize),
             needUpload: peers.some(p => p.needUpload),
             needDownload: peers.some(p => p.needDownload),
+            uploadProgress: peers.reduce<number | null>(
+              (min, p) =>
+                p.uploading && typeof p.uploadProgress === 'number'
+                  ? Math.min(min ?? 1, p.uploadProgress)
+                  : min,
+              null
+            ),
           }) satisfies BlobSyncBlobState
       ),
       share({

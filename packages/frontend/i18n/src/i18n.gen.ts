@@ -2278,6 +2278,34 @@ export function useAFFiNEI18N(): {
       */
     ["com.affine.error.loading-timeout-error"](): string;
     /**
+      * `Still syncing…`
+      */
+    ["com.affine.editor.still-syncing.title"](): string;
+    /**
+      * `This doc is taking longer than usual to load. It will open as soon as it's ready.`
+      */
+    ["com.affine.editor.still-syncing.description"](): string;
+    /**
+      * `Retry`
+      */
+    ["com.affine.editor.still-syncing.retry"](): string;
+    /**
+      * `Synced`
+      */
+    ["com.affine.doc-sync-status.synced"](): string;
+    /**
+      * `Syncing…`
+      */
+    ["com.affine.doc-sync-status.syncing"](): string;
+    /**
+      * `Offline. Changes are saved on this device and will sync when you're back online.`
+      */
+    ["com.affine.doc-sync-status.offline"](): string;
+    /**
+      * `Can't sync right now, retrying…`
+      */
+    ["com.affine.doc-sync-status.error"](): string;
+    /**
       * `Refetch`
       */
     ["com.affine.error.refetch"](): string;

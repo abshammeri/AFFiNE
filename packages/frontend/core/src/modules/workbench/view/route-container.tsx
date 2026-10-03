@@ -10,6 +10,7 @@ import { SidebarSwitch } from '../../app-sidebar/views/sidebar-header';
 import { ViewService } from '../services/view';
 import { WorkbenchService } from '../services/workbench';
 import * as styles from './route-container.css';
+import { RouteLoadingBar } from './route-loading-bar';
 import { useViewPosition } from './use-view-position';
 import { ViewBodyTarget, ViewHeaderTarget } from './view-islands';
 
@@ -57,6 +58,7 @@ export const RouteContainer = () => {
 
   return (
     <div className={styles.root}>
+      <RouteLoadingBar />
       <div
         className={styles.header}
         data-show-switch={showSwitch && !leftSidebarOpen}

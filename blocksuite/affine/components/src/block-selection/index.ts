@@ -29,7 +29,16 @@ export class BlockSelection extends SignalWatcher(LitElement) {
       width: 100%;
       height: 100%;
       pointer-events: none;
-      background-color: var(--affine-hover-color);
+      /*
+       * Selected blocks use a translucent blue (like Notion) derived from the
+       * theme primary colour, distinct from the grey hover colour.
+       */
+      background-color: rgba(35, 131, 226, 0.14);
+      background-color: color-mix(
+        in srgb,
+        var(--affine-primary-color) 14%,
+        transparent
+      );
       border-color: transparent;
       border-style: solid;
     }

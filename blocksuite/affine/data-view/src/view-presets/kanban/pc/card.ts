@@ -14,6 +14,9 @@ import type { KanbanColumn } from '../kanban-view-manager.js';
 import type { KanbanViewUILogic } from './kanban-view-ui-logic.js';
 import { openDetail, popCardMenu } from './menu.js';
 
+// Max pointer movement (px) between pointerdown and click to count as a click.
+const DRAG_CLICK_THRESHOLD = 4;
+
 const styles = css`
   affine-data-view-kanban-card {
     display: flex;
@@ -276,29 +279,36 @@ export class KanbanCard extends SignalWatcher(
     this._disposables.addFromEvent(this, 'contextmenu', e => {
       this.contextMenu(e);
     });
+    this._disposables.addFromEvent(this, 'pointerdown', e => {
+      this._pointerDownPosition = { x: e.clientX, y: e.clientY };
+    });
     this._disposables.addFromEvent(this, 'click', e => {
-      if (e.shiftKey) {
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
         this.getSelection()?.shiftClickCard(e);
         return;
       }
-      const selection = this.getSelection();
-      const preSelection = selection?.selection;
-
-      if (preSelection?.selectionType !== 'card') return;
-
-      if (selection) {
-        selection.selection = undefined;
+      // A drag (move card) must not open the card.
+      if (this._isDragClick(e)) {
+        return;
       }
-      this.kanbanViewLogic.root.openDetailPanel({
-        view: this.view,
-        rowId: this.cardId,
-        onClose: () => {
-          if (selection) {
-            selection.selection = preSelection;
-          }
-        },
-      });
+      const selection = this.getSelection();
+      if (!selection) return;
+      // Clicking a card opens its detail/peek, as in Notion. Clicks on
+      // editable cells and card buttons are handled (and stopped) by them.
+      openDetail(this.kanbanViewLogic, this.cardId, selection);
     });
+  }
+
+  private _pointerDownPosition?: { x: number; y: number };
+
+  private _isDragClick(e: MouseEvent) {
+    const start = this._pointerDownPosition;
+    this._pointerDownPosition = undefined;
+    if (!start) {
+      return false;
+    }
+    const distance = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    return distance > DRAG_CLICK_THRESHOLD;
   }
 
   override render() {

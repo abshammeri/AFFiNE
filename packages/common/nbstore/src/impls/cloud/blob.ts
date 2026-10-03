@@ -2,6 +2,7 @@ import { UserFriendlyError } from '@affine/error';
 
 import {
   type BlobRecord,
+  type BlobSetOptions,
   type BlobSource,
   BlobStorageBase,
   type SourceBlobRecord,
@@ -336,8 +337,12 @@ export class CloudBlobStorage extends BlobStorageBase {
     return failed;
   }
 
-  override set(blob: BlobRecord, signal?: AbortSignal) {
-    return this.writer.set(blob, signal);
+  override set(
+    blob: BlobRecord,
+    signal?: AbortSignal,
+    options?: BlobSetOptions
+  ) {
+    return this.writer.set(blob, signal, options?.onProgress);
   }
 
   override delete(key: string, permanently: boolean) {

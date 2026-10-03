@@ -22,6 +22,12 @@ export class HandleEventWatcher {
       const block = this.widget.anchorBlockComponent;
       if (!block) return;
 
+      // The grip keeps its size and position; hover feedback is handled in CSS.
+      if (this.widget.isBlockGripMode) {
+        this.widget.isDragHandleHovered = true;
+        return;
+      }
+
       const padding = DRAG_HANDLE_CONTAINER_PADDING * this.widget.scale.peek();
       container.style.paddingTop = `${padding}px`;
       container.style.paddingBottom = `${padding}px`;

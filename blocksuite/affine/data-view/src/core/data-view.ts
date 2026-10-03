@@ -13,7 +13,12 @@ import {
   ShadowlessElement,
   type UIEventHandler,
 } from '@blocksuite/std';
-import { computed, type ReadonlySignal, signal } from '@preact/signals-core';
+import {
+  computed,
+  type ReadonlySignal,
+  signal,
+  untracked,
+} from '@preact/signals-core';
 import { css, unsafeCSS } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
@@ -36,6 +41,13 @@ export type DataViewRendererConfig = {
     toast: (message: string) => void;
   };
   virtualPadding$: ReadonlySignal<number>;
+  /**
+   * Whether the view is rendered inside a transformed (zoomable) surface such
+   * as the edgeless canvas. Some renderers (e.g. the virtualized table) rely
+   * on unscaled layout offsets and are only enabled automatically when this
+   * is falsy.
+   */
+  isEdgeless?: () => boolean;
   headerWidget: DataViewWidget | undefined;
   handleEvent: (name: EventName, handler: UIEventHandler) => DisposableMember;
   bindHotkey: (hotkeys: Record<string, UIEventHandler>) => DisposableMember;
@@ -74,7 +86,10 @@ export class DataViewRootUILogic {
     const mobileLogic = view.meta.renderer.mobileLogic;
     const logic = (IS_MOBILE ? mobileLogic : pcLogic) ?? pcLogic;
 
-    return new (logic(view))(this, view);
+    // Decide the implementation once, when the view is created. Reads are
+    // untracked so that data changes (e.g. row count) don't re-run `views$`.
+    const Logic = untracked(() => logic(view, this));
+    return new Logic(this, view);
   }
   private readonly _viewsCache = new Map<
     string,

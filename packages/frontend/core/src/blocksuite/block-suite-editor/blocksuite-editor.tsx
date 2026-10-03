@@ -323,11 +323,13 @@ export const BlockSuiteEditor = (props: EditorProps) => {
   }, [loadStartTime, props.page]);
 
   useEffect(() => {
+    // not an error: after a while show a calm "still syncing" state that keeps
+    // waiting for the doc, the editor replaces it as soon as the doc is ready
     const timer = setTimeout(() => {
       if (isLoading) {
         setLongerLoading(true);
       }
-    }, 20 * 1000);
+    }, 10 * 1000);
     const reportErrorTimer = setTimeout(() => {
       if (isLoading) {
         track.doc.$.$.loadDoc({

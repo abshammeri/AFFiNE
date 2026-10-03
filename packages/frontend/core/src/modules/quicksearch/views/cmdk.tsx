@@ -15,10 +15,16 @@ import {
 
 import type { QuickSearchGroup } from '../types/group';
 import type { QuickSearchItem } from '../types/item';
+import type { QuickSearchSubmitOptions } from '../types/options';
 import * as styles from './cmdk.css';
 import { HighlightText } from './highlight-text';
 
 type Groups = { group?: QuickSearchGroup; items: QuickSearchItem[] }[];
+
+type SubmitHandler = (
+  item: QuickSearchItem,
+  options?: QuickSearchSubmitOptions
+) => void;
 
 const EMPTY_GROUPS: Groups = [];
 
@@ -42,7 +48,7 @@ export const CMDK = ({
   loading?: boolean;
   loadingProgress?: number;
   groups?: Groups;
-  onSubmit?: (item: QuickSearchItem) => void;
+  onSubmit?: SubmitHandler;
   onQueryChange?: (query: string) => void;
 }>) => {
   const [opening, setOpening] = useState(false);
@@ -116,6 +122,21 @@ export const CMDK = ({
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // whether the modifier key (Cmd/Ctrl) was held during the last keydown / pointerdown,
+  // cmdk triggers `onSelect` synchronously from these events so this is always fresh
+  const modKeyRef = useRef(false);
+  const trackModKey = useCallback(
+    (e: React.KeyboardEvent | React.PointerEvent) => {
+      modKeyRef.current = environment.isMacOs ? e.metaKey : e.ctrlKey;
+    },
+    []
+  );
+  const handleSubmit = useCallback(
+    (item: QuickSearchItem) => {
+      onSubmit?.(item, { newTab: modKeyRef.current });
+    },
+    [onSubmit]
+  );
 
   // fix list height animation on opening
   useLayoutEffect(() => {
@@ -173,6 +194,8 @@ export const CMDK = ({
       className={clsx(className, styles.root, styles.panelContainer)}
       value={selectedValue}
       onValueChange={handleSelectChange}
+      onKeyDownCapture={trackModKey}
+      onPointerDownCapture={trackModKey}
       loop
     >
       {inputLabel ? (
@@ -209,7 +232,7 @@ export const CMDK = ({
           return (
             <CMDKGroup
               key={group?.id ?? ''}
-              onSubmit={onSubmit}
+              onSubmit={handleSubmit}
               query={query}
               group={{ group, items }}
             />
@@ -226,7 +249,7 @@ export const CMDKGroup = ({
   query,
 }: {
   group: { group?: QuickSearchGroup; items: QuickSearchItem[] };
-  onSubmit?: (item: QuickSearchItem) => void;
+  onSubmit?: SubmitHandler;
   query: string;
 }) => {
   const i18n = useI18n();

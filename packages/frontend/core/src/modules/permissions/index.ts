@@ -16,7 +16,7 @@ import { type Framework } from '@toeverything/infra';
 
 import { WorkspaceServerService } from '../cloud/services/workspace-server';
 import { DocScope, DocService } from '../doc';
-import { NbstoreService } from '../storage';
+import { GlobalCache, NbstoreService } from '../storage';
 import {
   WorkspaceLocalState,
   WorkspaceScope,
@@ -64,6 +64,7 @@ export function configurePermissionsModule(framework: Framework) {
       WorkspaceService,
       WorkspaceServerService,
       NbstoreService,
+      GlobalCache,
     ]);
 
   framework

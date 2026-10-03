@@ -17,6 +17,8 @@ import {
   DRAG_HANDLE_GRABBER_BORDER_RADIUS,
   DRAG_HANDLE_GRABBER_HEIGHT,
   DRAG_HANDLE_GRABBER_WIDTH,
+  DRAG_HANDLE_GRIP_HEIGHT,
+  DRAG_HANDLE_GRIP_WIDTH,
 } from '../config.js';
 import { AFFINE_DRAG_HANDLE_WIDGET } from '../consts.js';
 import type { AffineDragHandleWidget } from '../drag-handle.js';
@@ -109,6 +111,20 @@ export class PointerEventWatcher {
     );
   };
 
+  /**
+   * Vertical offset (relative to the block content top) that centers the
+   * grabber on the first line of the block.
+   */
+  private readonly _getGrabberRowPaddingY = (
+    block: BlockComponent,
+    scaleInNote: number
+  ) => {
+    const containerHeight = getDragHandleContainerHeight(block.model);
+    return this.widget.isBlockGripMode
+      ? ((containerHeight - DRAG_HANDLE_GRIP_HEIGHT) / 2) * scaleInNote
+      : ((containerHeight - DRAG_HANDLE_GRABBER_HEIGHT) / 2 + 2) * scaleInNote;
+  };
+
   private readonly _containerStyle = computed(() => {
     const draggingAreaRect = this.widget.draggingAreaRect.value;
     if (!draggingAreaRect) return null;
@@ -116,26 +132,29 @@ export class PointerEventWatcher {
     const block = this.widget.anchorBlockComponent.value;
     if (!block) return null;
 
-    const containerHeight = getDragHandleContainerHeight(block.model);
-
     const posTop = this._getTopWithBlockComponent(block);
 
     const scaleInNote = this.widget.scaleInNote.value;
 
-    const rowPaddingY =
-      ((containerHeight - DRAG_HANDLE_GRABBER_HEIGHT) / 2 + 2) * scaleInNote;
+    const isGrip = this.widget.isBlockGripMode;
+    const grabberHeight = isGrip
+      ? DRAG_HANDLE_GRIP_HEIGHT
+      : DRAG_HANDLE_GRABBER_HEIGHT;
+    const containerWidth = isGrip
+      ? DRAG_HANDLE_GRIP_WIDTH
+      : DRAG_HANDLE_CONTAINER_WIDTH;
+
+    const rowPaddingY = this._getGrabberRowPaddingY(block, scaleInNote);
 
     // use padding to control grabber's height
     const paddingTop = rowPaddingY + posTop - draggingAreaRect.top;
     const paddingBottom =
-      draggingAreaRect.height -
-      paddingTop -
-      DRAG_HANDLE_GRABBER_HEIGHT * scaleInNote;
+      draggingAreaRect.height - paddingTop - grabberHeight * scaleInNote;
 
     return {
       paddingTop: `${paddingTop}px`,
       paddingBottom: `${paddingBottom}px`,
-      width: `${DRAG_HANDLE_CONTAINER_WIDTH * scaleInNote}px`,
+      width: `${containerWidth * scaleInNote}px`,
       left: `${draggingAreaRect.left}px`,
       top: `${draggingAreaRect.top}px`,
       height: `${draggingAreaRect.height}px`,
@@ -144,8 +163,11 @@ export class PointerEventWatcher {
 
   private readonly _grabberStyle = computed(() => {
     const scaleInNote = this.widget.scaleInNote.value;
+    const width = this.widget.isBlockGripMode
+      ? DRAG_HANDLE_GRIP_WIDTH
+      : DRAG_HANDLE_GRABBER_WIDTH;
     return {
-      width: `${DRAG_HANDLE_GRABBER_WIDTH * scaleInNote}px`,
+      width: `${width * scaleInNote}px`,
       borderRadius: `${DRAG_HANDLE_GRABBER_BORDER_RADIUS * scaleInNote}px`,
     };
   });
@@ -199,8 +221,10 @@ export class PointerEventWatcher {
         !this.widget.isBlockDragHandleVisible) &&
       !this.widget.isDragHandleHovered
     ) {
-      this.showDragHandleOnHoverBlock();
+      // Must be set before showing the handle so the add-block button is
+      // positioned and displayed on the first hover as well.
       this.widget.showAddBlockWidget = true;
+      this.showDragHandleOnHoverBlock();
       this._lastHoveredBlockId = this.widget.anchorBlockId.peek();
     }
   };
@@ -351,7 +375,10 @@ export class PointerEventWatcher {
         this.widget.showAddBlockWidget &&
         this.widget.mode === 'page'
       ) {
-        const posTop = this._getTopWithBlockComponent(block);
+        // Align the add-block button with the grip on the first line.
+        const posTop =
+          this._getTopWithBlockComponent(block) +
+          this._getGrabberRowPaddingY(block, this.widget.scaleInNote.peek());
         addBlockWidgetContainer.style.left = `${draggingAreaRect.left - ADD_BLOCK_WIDGET_WIDTH}px`;
         addBlockWidgetContainer.style.top = `${posTop}px`;
         addBlockWidgetContainer.style.height = 'auto';

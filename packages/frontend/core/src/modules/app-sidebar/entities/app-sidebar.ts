@@ -24,11 +24,21 @@ export class AppSidebar extends Entity {
     this.appSidebarState.get<boolean>(APP_SIDEBAR_STATE.OPEN) ?? true
   );
 
-  width$ = LiveData.from(
+  private readonly persistedWidth$ = LiveData.from(
     this.appSidebarState
       .watch<number>(APP_SIDEBAR_STATE.WIDTH)
       .pipe(map(value => value ?? 248)),
     this.appSidebarState.get<number>(APP_SIDEBAR_STATE.WIDTH) ?? 248
+  );
+
+  /**
+   * in-memory width while the user is dragging the resize handle,
+   * only persisted once the drag ends (see {@link setWidth})
+   */
+  private readonly draggingWidth$ = new LiveData<number | null>(null);
+
+  width$ = LiveData.computed(
+    get => get(this.draggingWidth$) ?? get(this.persistedWidth$)
   );
 
   /**
@@ -76,7 +86,18 @@ export class AppSidebar extends Entity {
     this.resizing$.next(resizing);
   };
 
+  /**
+   * update the width in memory only, used on every mousemove while dragging
+   */
+  setDraggingWidth = (width: number) => {
+    this.draggingWidth$.next(width);
+  };
+
+  /**
+   * persist the width, e.g. once on drag end
+   */
   setWidth = (width: number) => {
     this.appSidebarState.set(APP_SIDEBAR_STATE.WIDTH, width);
+    this.draggingWidth$.next(null);
   };
 }

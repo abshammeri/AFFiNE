@@ -21,6 +21,7 @@ import {
 import type { DatabaseCellContainer } from '../row/cell';
 import type { VirtualTableViewUILogic } from '../table-view-ui-logic.js';
 import type { TableGridCell } from '../types.js';
+import { getScrollContainer } from '../virtual/virtual-scroll.js';
 import {
   DragToFillElement,
   fillSelectionWithFocusCellData,
@@ -259,24 +260,142 @@ export class TableSelectionController implements ReactiveController {
     if (fillValues) {
       const focusCellContainer = this.getFocusCellContainer();
       cell = focusCellContainer ?? null;
+    } else if (target.closest('.dv-virtual-row-ops')) {
+      // Row ops (peek / more) inside the title cell handle their own clicks.
+      cell = null;
     } else {
       cell = target.closest('affine-database-virtual-cell-container');
     }
     return [cell, fillValues];
   }
 
+  /**
+   * Scrolls the page (y) and the table (x) so that a rectangle given in
+   * virtual-content coordinates becomes visible ("nearest" semantics). The
+   * non-virtual table uses `scrollIntoView` on DOM nodes, but here the target
+   * row may not be rendered yet.
+   */
+  private scrollContentRectIntoView(rect: {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  }) {
+    const content = this.virtualScroll?.content;
+    if (!content?.isConnected) return;
+    const contentRect = content.getBoundingClientRect();
+    const margin = 8;
+    const scrollAxis = (
+      container: HTMLElement,
+      start: number,
+      end: number,
+      viewStart: number,
+      viewEnd: number,
+      axis: 'scrollTop' | 'scrollLeft'
+    ) => {
+      if (start < viewStart + margin) {
+        container[axis] -= viewStart + margin - start;
+      } else if (end > viewEnd - margin) {
+        container[axis] += Math.min(
+          end - (viewEnd - margin),
+          start - (viewStart + margin)
+        );
+      }
+    };
+    const yContainer = this.logic.yScrollContainer;
+    if (yContainer) {
+      const isRoot =
+        yContainer === document.body || yContainer === document.documentElement;
+      const viewTop = isRoot ? 0 : yContainer.getBoundingClientRect().top;
+      const viewBottom = isRoot
+        ? window.innerHeight
+        : viewTop + yContainer.clientHeight;
+      scrollAxis(
+        isRoot ? (document.scrollingElement as HTMLElement) : yContainer,
+        contentRect.top + rect.top,
+        contentRect.top + rect.bottom,
+        viewTop,
+        viewBottom,
+        'scrollTop'
+      );
+    }
+    const xContainer = getScrollContainer(content, 'x');
+    if (xContainer && xContainer !== document.body) {
+      const xRect = xContainer.getBoundingClientRect();
+      // Keep clear of the sticky row-header column on the left.
+      const columnStart = this.virtualScroll?.columnPosition$.value[1]?.left;
+      scrollAxis(
+        xContainer,
+        contentRect.left + rect.left,
+        contentRect.left + rect.right,
+        xRect.left + (columnStart ?? 0),
+        xRect.left + xContainer.clientWidth,
+        'scrollLeft'
+      );
+    }
+  }
+
+  private selectionRect(selection: TableViewAreaSelection | undefined) {
+    if (!selection) return;
+    const rect = this.getRect(
+      selection.groupKey,
+      selection.rowsSelection.start,
+      selection.rowsSelection.end,
+      selection.columnsSelection.start,
+      selection.columnsSelection.end
+    );
+    if (!rect) return;
+    return {
+      top: rect.top,
+      bottom: rect.top + rect.height,
+      left: rect.left,
+      right: rect.left + rect.width,
+    };
+  }
+
+  private scrollAreaBorderIntoView(
+    position: 'left' | 'right' | 'top' | 'bottom'
+  ) {
+    const selection = this.areaSelection;
+    const rect = this.selectionRect(selection);
+    if (!rect) return;
+    const edge = { ...rect };
+    if (position === 'top') edge.bottom = rect.top + 1;
+    if (position === 'bottom') edge.top = rect.bottom - 1;
+    if (position === 'left') edge.right = rect.left + 1;
+    if (position === 'right') edge.left = rect.right - 1;
+    this.scrollContentRectIntoView(edge);
+  }
+
+  private get areaSelection() {
+    const selection = this.selection;
+    return selection?.selectionType === 'area' ? selection : undefined;
+  }
+
   private scrollToAreaSelection() {
-    // this.areaSelectionElement?.scrollIntoView({
-    //   block: 'nearest',
-    //   inline: 'nearest',
-    // });
+    const rect = this.selectionRect(this.areaSelection);
+    if (rect) {
+      this.scrollContentRectIntoView(rect);
+    }
   }
 
   private scrollToFocus() {
-    // this.focusSelectionElement?.scrollIntoView({
-    //   block: 'nearest',
-    //   inline: 'nearest',
-    // });
+    const selection = this.areaSelection;
+    if (!selection) return;
+    const rect = this.getRect(
+      selection.groupKey,
+      selection.focus.rowIndex,
+      selection.focus.rowIndex,
+      selection.focus.columnIndex,
+      selection.focus.columnIndex
+    );
+    if (!rect) return;
+    this.scrollContentRectIntoView({
+      top: rect.top,
+      bottom: rect.top + rect.height,
+      left: rect.left,
+      right: rect.left + rect.width,
+    });
   }
 
   areaToRows(selection: TableViewAreaSelection) {
@@ -724,22 +843,14 @@ export class TableSelectionController implements ReactiveController {
         (this.rows(newSelection.groupKey)?.length ?? 0) - 1,
         newSelection.rowsSelection.end + 1
       );
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('bottom')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('bottom');
+      });
     } else {
       newSelection.rowsSelection.start += 1;
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('top')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('top');
+      });
     }
     this.selection = newSelection;
   }
@@ -755,22 +866,14 @@ export class TableSelectionController implements ReactiveController {
         0,
         newSelection.columnsSelection.start - 1
       );
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('left')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('left');
+      });
     } else {
       newSelection.columnsSelection.end -= 1;
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('right')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('right');
+      });
     }
     this.selection = newSelection;
   }
@@ -789,22 +892,14 @@ export class TableSelectionController implements ReactiveController {
         max,
         newSelection.columnsSelection.end + 1
       );
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('right')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('right');
+      });
     } else {
       newSelection.columnsSelection.start += 1;
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('left')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('left');
+      });
     }
     this.selection = newSelection;
   }
@@ -820,22 +915,14 @@ export class TableSelectionController implements ReactiveController {
         0,
         newSelection.rowsSelection.start - 1
       );
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('top')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('top');
+      });
     } else {
       newSelection.rowsSelection.end -= 1;
-      // requestAnimationFrame(() => {
-      //   this.getSelectionAreaBorder('bottom')?.scrollIntoView({
-      //     block: 'nearest',
-      //     inline: 'nearest',
-      //     behavior: 'smooth',
-      //   });
-      // });
+      requestAnimationFrame(() => {
+        this.scrollAreaBorderIntoView('bottom');
+      });
     }
     this.selection = newSelection;
   }
@@ -1001,7 +1088,10 @@ export class SelectionElement extends SignalWatcher(
 
   focusPosition$ = computed(() => {
     const selection = this.selection$.value;
-    if (selection?.selectionType !== 'area') {
+    if (
+      selection?.selectionType !== 'area' ||
+      this.controller.logic.view.readonly$.value
+    ) {
       return;
     }
     const focus = selection.focus;
@@ -1038,7 +1128,10 @@ export class SelectionElement extends SignalWatcher(
 
   areaPosition$ = computed(() => {
     const selection = this.selection$.value;
-    if (selection?.selectionType !== 'area') {
+    if (
+      selection?.selectionType !== 'area' ||
+      this.controller.logic.view.readonly$.value
+    ) {
       return;
     }
     const groupKey = selection.groupKey;
@@ -1097,6 +1190,36 @@ export class SelectionElement extends SignalWatcher(
       <div class="database-selection" style=${areaStyle}></div>
       <div tabindex="0" class="database-focus" style=${focusStyle}></div>
     `;
+  }
+
+  /**
+   * Positions the drag-to-fill handle at the bottom-right corner of the focus
+   * cell, like the non-virtual table does.
+   */
+  private updateDragToFillHandle() {
+    const handle = this.controller.dragToFillDraggable;
+    if (!handle) return;
+    const focus = this.focusPosition$.peek();
+    const selection = this.selection$.peek();
+    if (!focus || selection?.selectionType !== 'area') {
+      handle.style.display = 'none';
+      return;
+    }
+    const isSingleRow =
+      selection.rowsSelection.end - selection.rowsSelection.start === 0;
+    const isSingleColumn =
+      selection.columnsSelection.end - selection.columnsSelection.start === 0;
+    const dragging = this.controller.__dragToFillElement.dragging;
+    const show =
+      !selection.isEditing && (dragging || isSingleRow) && isSingleColumn;
+    handle.style.left = `${focus.left + focus.width}px`;
+    handle.style.top = `${focus.top + focus.height}px`;
+    handle.style.display = show ? 'block' : 'none';
+  }
+
+  override updated(changed: Map<PropertyKey, unknown>) {
+    super.updated(changed);
+    this.updateDragToFillHandle();
   }
 
   @property({ attribute: false })

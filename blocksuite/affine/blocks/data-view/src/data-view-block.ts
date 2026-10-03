@@ -247,6 +247,8 @@ export class DataViewBlockComponent extends CaptionedBlockComponent<DataViewBloc
   }
   private readonly dataViewRootLogic = new DataViewRootUILogic({
     virtualPadding$: signal(0),
+    isEdgeless: () =>
+      this.std.get(DocModeProvider).getEditorMode() === 'edgeless',
     bindHotkey: this._bindHotkey,
     handleEvent: this._handleEvent,
     selection$: this.selection$,

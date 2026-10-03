@@ -422,6 +422,8 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     () =>
       new DataViewRootUILogic({
         virtualPadding$: this.virtualPadding$,
+        isEdgeless: () =>
+          this.std.get(DocModeProvider).getEditorMode() === 'edgeless',
         bindHotkey: hotkeys => {
           return {
             dispose: this.host.event.bindHotkey(hotkeys, {

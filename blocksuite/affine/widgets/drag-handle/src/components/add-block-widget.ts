@@ -1,3 +1,4 @@
+import { unsafeCSSVarV2 } from '@blocksuite/affine-shared/theme';
 import { PlusIcon } from '@blocksuite/icons/lit';
 import { css, html, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
@@ -16,30 +17,39 @@ export class AffineAddBlockWidget extends LitElement {
       align-items: center;
       justify-content: center;
       width: 18px;
-      height: 18px;
-      margin-top: 8px;
+      height: 24px;
       cursor: pointer;
       border-radius: 4px;
-      color: var(--affine-placeholder-color);
+      color: ${unsafeCSSVarV2('icon/secondary')};
       background: transparent;
       border: none;
       padding: 0;
       transition:
-        color 0.2s ease,
-        background 0.2s ease;
+        color 0.12s ease,
+        background 0.12s ease;
+      animation: affine-add-block-fade-in 120ms ease-out;
       pointer-events: auto;
       user-select: none;
       box-sizing: border-box;
     }
 
     .affine-add-block-widget:hover {
-      background: var(--affine-hover-color);
+      background: ${unsafeCSSVarV2('layer/background/hoverOverlay')};
       color: var(--affine-text-primary-color);
     }
 
+    @keyframes affine-add-block-fade-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
     .affine-add-block-widget svg {
-      width: 12px;
-      height: 12px;
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
     }
   `;
@@ -65,7 +75,7 @@ export class AffineAddBlockWidget extends LitElement {
         aria-label="Add block below"
         @click=${this._handleClick}
       >
-        ${PlusIcon({ width: '12', height: '12' })}
+        ${PlusIcon({ width: '16', height: '16' })}
       </button>
     `;
   }

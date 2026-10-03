@@ -99,6 +99,15 @@ export abstract class VirtualScroll extends NodeLifeCycle {
   }
 }
 
+/** Cancels pending show/hide work and removes a node's element from the DOM. */
+const releaseElement = (
+  renderTask: { cancel: () => void },
+  element: HTMLElement
+) => {
+  renderTask.cancel();
+  element.remove();
+};
+
 export class GridCell<GroupData, RowData, CellData> extends GridNode<CellData> {
   readonly renderTask;
   readonly element;
@@ -206,10 +215,14 @@ export class GridCell<GroupData, RowData, CellData> extends GridNode<CellData> {
   });
 
   checkRender() {
-    const isVisible = this.isVisible$.value;
-    if (isVisible && !this.element.isConnected) {
+    // Always (re)queue the task for the current visibility. Checking
+    // `element.isConnected` here raced with an already-queued hide task: the
+    // element was still connected when it became visible, so no show was
+    // queued, and the pending hide then removed a visible cell for good.
+    // The queued tasks themselves are no-ops when nothing needs to change.
+    if (this.isVisible$.value) {
       this.renderTask.show();
-    } else if (!isVisible && this.element.isConnected) {
+    } else {
       this.renderTask.hide();
     }
   }
@@ -220,8 +233,7 @@ export class GridCell<GroupData, RowData, CellData> extends GridNode<CellData> {
 
   override dispose() {
     super.dispose();
-    this.renderTask.cancel();
-    this.element.remove();
+    releaseElement(this.renderTask, this.element);
   }
 }
 
@@ -292,6 +304,7 @@ export class GridRow<GroupData, RowData, CellData> extends GridNode<RowData> {
 }
 export class GroupNode<GroupData, RowData, CellData> extends NodeLifeCycle {
   readonly renderTask;
+  readonly element: VirtualElementWrapper;
   readonly height$ = signal<number | undefined>();
   readonly bottom$ = computed(() => {
     const top = this.top$.value;
@@ -317,6 +330,7 @@ export class GroupNode<GroupData, RowData, CellData> extends NodeLifeCycle {
   ) {
     super();
     const element = new VirtualElementWrapper();
+    this.element = element;
     element.rect = {
       left$: signal(0),
       top$,
@@ -337,12 +351,19 @@ export class GroupNode<GroupData, RowData, CellData> extends NodeLifeCycle {
         cancel();
       }
     });
+    this.disposables.push(cancel);
     this.disposables.push(
       effect(() => {
         this.checkRender();
       })
     );
   }
+
+  override dispose() {
+    super.dispose();
+    releaseElement(this.renderTask, this.element);
+  }
+
   get container() {
     return this.group.grid.container;
   }
@@ -482,6 +503,10 @@ export class GridGroup<
 
   override dispose() {
     super.dispose();
+    // Remove the group's header/footer, e.g. after the grouping changed;
+    // otherwise they stay in the DOM on top of the new groups.
+    this.topNode.dispose();
+    this.bottomNode.dispose();
   }
 }
 

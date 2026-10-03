@@ -4,6 +4,7 @@ import { css } from 'lit';
 import {
   ADD_BLOCK_WIDGET_WIDTH,
   DRAG_HANDLE_CONTAINER_WIDTH,
+  DRAG_HANDLE_FADE_IN_DURATION,
 } from './config.js';
 
 export const styles = css`
@@ -69,6 +70,37 @@ export const styles = css`
 
   .affine-drag-handle-grabber.dots:hover {
     background-color: ${unsafeCSSVarV2('layer/background/hoverOverlay')};
+  }
+
+  .affine-drag-handle-grabber.grip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border-radius: 4px;
+    background-color: transparent;
+    color: ${unsafeCSSVarV2('icon/secondary')};
+    transition: background-color ${DRAG_HANDLE_FADE_IN_DURATION}ms ease;
+    animation: affine-drag-handle-fade-in ${DRAG_HANDLE_FADE_IN_DURATION}ms
+      ease-out;
+  }
+
+  .affine-drag-handle-container:hover .affine-drag-handle-grabber.grip {
+    background-color: ${unsafeCSSVarV2('layer/background/hoverOverlay')};
+  }
+
+  .affine-drag-handle-grabber.grip > .grip-icon {
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  @keyframes affine-drag-handle-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .affine-drag-handle-grabber.dots > .dot {

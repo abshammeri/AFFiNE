@@ -80,7 +80,15 @@ export function AppSidebar({ children }: PropsWithChildren) {
     [appSidebarService]
   );
 
+  // keep the live width in memory while dragging, persist once on drag end
   const handleWidthChange = useCallback(
+    (width: number) => {
+      appSidebarService.setDraggingWidth(width);
+    },
+    [appSidebarService]
+  );
+
+  const handleWidthChanged = useCallback(
     (width: number) => {
       appSidebarService.setWidth(width);
     },
@@ -171,6 +179,7 @@ export function AppSidebar({ children }: PropsWithChildren) {
         onOpen={handleOpenChange}
         onResizing={handleResizing}
         onWidthChange={handleWidthChange}
+        onWidthChanged={handleWidthChanged}
         unmountOnExit={false}
         className={clsx(navWrapperStyle, {
           [hoverNavWrapperStyle]: sidebarState === 'floating',

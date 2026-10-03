@@ -24,6 +24,14 @@ export type BlobSource =
       timestampMs: number;
     };
 
+export interface BlobSetOptions {
+  /**
+   * Called while the blob is being written with the number of bytes written so far.
+   * Storages that can't report progress may never call it.
+   */
+  onProgress?: (uploadedBytes: number, totalBytes: number) => void;
+}
+
 export interface SourceBlobRecord extends ListedBlobRecord {
   source: BlobSource;
 }
@@ -48,7 +56,11 @@ export interface BlobStorage extends Storage {
     signal?: AbortSignal,
     source?: BlobSource
   ): Promise<BlobRecord | null>;
-  set(blob: BlobRecord, signal?: AbortSignal): Promise<void>;
+  set(
+    blob: BlobRecord,
+    signal?: AbortSignal,
+    options?: BlobSetOptions
+  ): Promise<void>;
   delete(
     key: string,
     permanently: boolean,
@@ -67,7 +79,11 @@ export abstract class BlobStorageBase implements BlobStorage {
     signal?: AbortSignal,
     source?: BlobSource
   ): Promise<BlobRecord | null>;
-  abstract set(blob: BlobRecord, signal?: AbortSignal): Promise<void>;
+  abstract set(
+    blob: BlobRecord,
+    signal?: AbortSignal,
+    options?: BlobSetOptions
+  ): Promise<void>;
   abstract delete(
     key: string,
     permanently: boolean,

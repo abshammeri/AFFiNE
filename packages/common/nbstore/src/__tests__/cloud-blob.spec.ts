@@ -941,3 +941,84 @@ test('releases transient workspace sources and preserves owned registrations', a
     registered.map(source => contended.unregisterSource(source))
   );
 });
+
+test('uploads multipart parts in parallel and completes with ordered parts', async () => {
+  const storage = createStorage();
+  let completedParts: { partNumber: number; etag: string }[] | undefined;
+  const gqlMock = vi.fn(async ({ query, variables }) => {
+    if (query === workspaceBlobQuotaQuery) return quotaResponse;
+    if (query === createBlobUploadMutation) {
+      return {
+        createBlobUpload: {
+          method: BlobUploadMethod.MULTIPART,
+          blobKey: 'blob-key',
+          alreadyUploaded: false,
+          uploadId: 'upload-1',
+          partSize: 2,
+          uploadedParts: [{ partNumber: 2, etag: 'etag-existing' }],
+        },
+      };
+    }
+    if (query === getBlobUploadPartUrlQuery) {
+      return {
+        workspace: {
+          blobUploadPartUrl: {
+            uploadUrl: `https://upload.example.com/part/${variables.partNumber}`,
+          },
+        },
+      };
+    }
+    if (query === completeBlobUploadMutation) {
+      completedParts = variables.parts;
+      return { completeBlobUpload: 'blob-key' };
+    }
+    throw new Error('Unexpected query');
+  });
+  vi.spyOn(storage.connection, 'gql').mockImplementation(
+    gqlMock as typeof storage.connection.gql
+  );
+
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchMock = vi.fn(async (input: string) => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    const partNumber = Number(input.split('/').pop());
+    // later parts finish first
+    await new Promise(resolve => setTimeout(resolve, 20 - partNumber * 2));
+    inFlight -= 1;
+    return new Response('', {
+      status: 200,
+      headers: { etag: `etag-${partNumber}` },
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const progress: number[] = [];
+  await storage.set(
+    {
+      key: 'blob-key',
+      // 7 parts of 2 bytes, part 2 already uploaded
+      data: new Uint8Array(13),
+      mime: 'text/plain',
+    },
+    undefined,
+    { onProgress: uploaded => progress.push(uploaded) }
+  );
+
+  expect(fetchMock).toHaveBeenCalledTimes(6);
+  expect(maxInFlight).toBe(4);
+  expect(completedParts).toEqual([
+    { partNumber: 1, etag: 'etag-1' },
+    { partNumber: 2, etag: 'etag-existing' },
+    { partNumber: 3, etag: 'etag-3' },
+    { partNumber: 4, etag: 'etag-4' },
+    { partNumber: 5, etag: 'etag-5' },
+    { partNumber: 6, etag: 'etag-6' },
+    { partNumber: 7, etag: 'etag-7' },
+  ]);
+  expect(progress[0]).toBe(0);
+  expect(progress).toContain(2);
+  expect(progress.at(-1)).toBe(13);
+  expect([...progress].sort((a, b) => a - b)).toEqual(progress);
+});
