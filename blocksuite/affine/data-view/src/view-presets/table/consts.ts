@@ -1,7 +1,7 @@
 /** column default width */
 export const DEFAULT_COLUMN_WIDTH = 180;
 /** column min width */
-export const DEFAULT_COLUMN_MIN_WIDTH = 100;
+export const DEFAULT_COLUMN_MIN_WIDTH = 60;
 /** column title height */
 export const DEFAULT_COLUMN_TITLE_HEIGHT = 34;
 /** column title height */

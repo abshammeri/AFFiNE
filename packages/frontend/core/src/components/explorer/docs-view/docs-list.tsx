@@ -142,7 +142,7 @@ export const DocsExplorer = ({
             return {
               id: docId,
               Component: DocListItemComponent,
-              height: 42,
+              height: BUILD_CONFIG.isMobileEdition ? 42 : 36,
             } satisfies MasonryItem;
           }
           return {
@@ -252,7 +252,7 @@ export const DocsExplorer = ({
       <Masonry
         className={className}
         items={masonryItems}
-        gapY={BUILD_CONFIG.isMobileEdition ? 12 : view === 'list' ? 12 : 24}
+        gapY={BUILD_CONFIG.isMobileEdition ? 12 : view === 'list' ? 0 : 24}
         gapX={BUILD_CONFIG.isMobileEdition ? 12 : 24}
         groupsGap={12}
         groupHeaderGapWithItems={12}

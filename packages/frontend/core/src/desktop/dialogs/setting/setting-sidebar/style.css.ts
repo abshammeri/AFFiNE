@@ -2,8 +2,7 @@ import { cssVar } from '@toeverything/theme';
 import { cssVarV2 } from '@toeverything/theme/v2';
 import { globalStyle, style } from '@vanilla-extract/css';
 export const settingSlideBar = style({
-  width: '25%',
-  maxWidth: '242px',
+  width: '240px',
   background: cssVar('backgroundSecondaryColor'),
   padding: '20px 0px 0px 12px',
   height: '100%',
