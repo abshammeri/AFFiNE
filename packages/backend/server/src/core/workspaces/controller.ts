@@ -35,6 +35,21 @@ import { DocReader } from '../doc/reader';
 import { PermissionAccess } from '../permission';
 import { CommentAttachmentStorage } from '../storage';
 
+// url-safe base64 (no padding) encoding of a sha256 digest
+const CONTENT_ADDRESSED_BLOB_KEY = /^[A-Za-z0-9_-]{43}$/;
+
+function isContentAddressedBlobKey(key: string) {
+  return CONTENT_ADDRESSED_BLOB_KEY.test(key);
+}
+
+function matchesIfNoneMatch(header: string | undefined, etag: string) {
+  if (!header) return false;
+  return header
+    .split(',')
+    .map(value => value.trim().replace(/^W\//, ''))
+    .some(value => value === '*' || value === etag);
+}
+
 @Controller('/api/workspaces')
 export class WorkspacesController {
   logger = new Logger(WorkspacesController.name);
@@ -148,7 +163,21 @@ export class WorkspacesController {
     res.setHeader('content-type', blob.mime);
     res.setHeader('content-length', blob.size);
     res.setHeader('last-modified', new Date(blob.lastModifiedMs).toUTCString());
-    res.setHeader('cache-control', 'private, no-store');
+    // Workspace blob keys are the url-safe base64 sha256 of their content and
+    // the runtime rejects promotions whose body does not match the key, so a
+    // key in that shape always maps to the same bytes and can be cached.
+    if (isContentAddressedBlobKey(name)) {
+      const etag = `"${name}"`;
+      res.setHeader('cache-control', 'private, max-age=31536000, immutable');
+      res.setHeader('etag', etag);
+      if (matchesIfNoneMatch(res.req?.headers['if-none-match'], etag)) {
+        await this.runtime.closeBlobStreamV1(blob.streamId);
+        res.status(304).end();
+        return;
+      }
+    } else {
+      res.setHeader('cache-control', 'private, no-store');
+    }
     applyAttachHeaders(res, { contentType: blob.mime, filename: name });
     const body = Readable.from(
       (async function* (runtime: BackendRuntimeProvider) {
