@@ -13,8 +13,7 @@ import { expect, type Page } from '@playwright/test';
 const movePageToTrash = async (page: Page, docId: string) => {
   await getPageOperationButton(page, docId).click();
   await page.getByTestId('doc-list-operation-trash').click();
-  await expect(page.getByRole('dialog', { name: 'Delete doc?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
 };
 
 const createAndTrashPage = async (page: Page, title: string) => {

@@ -37,15 +37,55 @@ export interface ViewManager {
   viewChangeType(id: string, type: string): void;
 }
 
+const RECENT_VIEWS_KEY = 'affine:data-view:recent-views';
+const RECENT_VIEWS_LIMIT = 200;
+
+/**
+ * View ids are globally unique, so remembering the most recently selected
+ * ones is enough to restore the last view of each database on reload.
+ */
+const readRecentViewIds = (): string[] => {
+  try {
+    const raw = globalThis.localStorage?.getItem(RECENT_VIEWS_KEY);
+    const ids: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const rememberViewId = (id: string) => {
+  try {
+    const ids = [id, ...readRecentViewIds().filter(v => v !== id)];
+    globalThis.localStorage?.setItem(
+      RECENT_VIEWS_KEY,
+      JSON.stringify(ids.slice(0, RECENT_VIEWS_LIMIT))
+    );
+  } catch {
+    // storage unavailable, the view just won't be remembered
+  }
+};
+
 export class ViewManagerBase implements ViewManager {
   _currentViewId$ = signal<string | undefined>(undefined);
+
+  private readonly _recentViewIds = readRecentViewIds();
 
   views$ = computed(() => {
     return this.dataSource.viewDataList$.value.map(data => data.id);
   });
 
+  private readonly _rememberedViewId$ = computed(() => {
+    const views = this.views$.value;
+    return this._recentViewIds.find(id => views.includes(id));
+  });
+
   currentViewId$ = computed(() => {
-    return this._currentViewId$.value ?? this.views$.value[0];
+    const current = this._currentViewId$.value;
+    if (current && this.views$.value.includes(current)) {
+      return current;
+    }
+    return this._rememberedViewId$.value ?? this.views$.value[0];
   });
 
   currentView$ = computed(() => {
@@ -70,6 +110,9 @@ export class ViewManagerBase implements ViewManager {
 
   setCurrentView(id: string | undefined): void {
     this._currentViewId$.value = id;
+    if (id) {
+      rememberViewId(id);
+    }
   }
 
   viewAdd(type: DataViewMode): string {

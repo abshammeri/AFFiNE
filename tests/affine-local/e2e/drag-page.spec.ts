@@ -75,10 +75,7 @@ const dragToCollection = async (page: Page, dragItem: Locator) => {
 const dragToTrash = async (page: Page, title: string, dragItem: Locator) => {
   // drag to trash
   await dragTo(page, dragItem, page.getByTestId('trash-page'));
-  const confirmTip = page.getByText('Delete doc?');
-  await expect(confirmTip).toBeVisible();
-
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash').last()).toBeVisible();
 
   await expect(
     page.getByText(title),

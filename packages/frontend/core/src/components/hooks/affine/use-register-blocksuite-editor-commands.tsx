@@ -1,8 +1,9 @@
-import { toast, useConfirmModal } from '@affine/component';
+import { toast } from '@affine/component';
 import {
   PreconditionStrategy,
   registerAffineCommand,
 } from '@affine/core/commands';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { DocService } from '@affine/core/modules/doc';
 import type { Editor } from '@affine/core/modules/editor';
@@ -68,34 +69,22 @@ export function useRegisterBlocksuiteEditorCommands(
 
   const { duplicate } = useBlockSuiteMetaHelper();
   const exportHandler = useExportPage();
-  const { openConfirmModal } = useConfirmModal();
   const onClickDelete = useCallback(() => {
-    openConfirmModal({
-      title: t['com.affine.moveToTrash.confirmModal.title'](),
-      description: t['com.affine.moveToTrash.confirmModal.description']({
-        title: doc.title$.value || t['Untitled'](),
-      }),
-      cancelText: t['com.affine.confirmModal.button.cancel'](),
-      confirmButtonOptions: {
-        variant: 'error',
-      },
-      confirmText: t.Delete(),
-      onConfirm: async () => {
-        try {
-          const canTrash = await guardService.can('Doc_Trash', docId);
-          if (!canTrash) {
-            toast(t['com.affine.no-permission']());
-            return;
-          }
-          await doc.moveToTrash();
-        } catch (error) {
-          console.error(error);
-          const userFriendlyError = UserFriendlyError.fromAny(error);
-          toast(t[`error.${userFriendlyError.name}`](userFriendlyError.data));
+    (async () => {
+      try {
+        const canTrash = await guardService.can('Doc_Trash', docId);
+        if (!canTrash) {
+          toast(t['com.affine.no-permission']());
+          return;
         }
-      },
-    });
-  }, [doc, docId, guardService, openConfirmModal, t]);
+        await moveToTrashWithUndo([doc]);
+      } catch (error) {
+        console.error(error);
+        const userFriendlyError = UserFriendlyError.fromAny(error);
+        toast(t[`error.${userFriendlyError.name}`](userFriendlyError.data));
+      }
+    })().catch(console.error);
+  }, [doc, docId, guardService, t]);
 
   const isCloudWorkspace = workspace.flavour !== 'local';
 

@@ -1,10 +1,11 @@
-import { notify, toast, useConfirmModal } from '@affine/component';
+import { notify, toast } from '@affine/component';
 import {
   Menu,
   MenuItem,
   MenuSeparator,
   MenuSub,
 } from '@affine/component/ui/menu';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import { PageHistoryModal } from '@affine/core/components/affine/page-history-modal';
 import { useGuard } from '@affine/core/components/guard';
 import { useBlockSuiteMetaHelper } from '@affine/core/components/hooks/affine/use-block-suite-meta-helper';
@@ -192,30 +193,18 @@ const PageHeaderMenuItem = ({
     });
   }, [pageId, workbench]);
 
-  const { openConfirmModal } = useConfirmModal();
-
   const handleOpenTrashModal = useCallback(() => {
     track.$.header.docOptions.deleteDoc();
-    openConfirmModal({
-      title: t['com.affine.moveToTrash.confirmModal.title'](),
-      description: t['com.affine.moveToTrash.confirmModal.description']({
-        title: editorService.editor.doc.title$.value || t['Untitled'](),
-      }),
-      cancelText: t['com.affine.confirmModal.button.cancel'](),
-      confirmText: t.Delete(),
-      confirmButtonOptions: {
-        variant: 'error',
-      },
-      onConfirm: async () => {
-        const canTrash = await guardService.can('Doc_Trash', pageId);
-        if (!canTrash) {
-          toast(t['com.affine.no-permission']());
-          return;
-        }
-        await editorService.editor.doc.moveToTrash();
-      },
-    });
-  }, [editorService.editor.doc, guardService, openConfirmModal, pageId, t]);
+    const doc = editorService.editor.doc;
+    (async () => {
+      const canTrash = await guardService.can('Doc_Trash', pageId);
+      if (!canTrash) {
+        toast(t['com.affine.no-permission']());
+        return;
+      }
+      await moveToTrashWithUndo([doc]);
+    })().catch(console.error);
+  }, [editorService.editor.doc, guardService, pageId, t]);
 
   const handleRename = useCallback(() => {
     rename?.();

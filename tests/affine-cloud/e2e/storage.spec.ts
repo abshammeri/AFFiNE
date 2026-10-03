@@ -40,8 +40,7 @@ test('should delete unused blobs after permanently deleting a doc', async ({
     .click();
   const deleteBtn = page.getByTestId('doc-list-operation-trash');
   await deleteBtn.click();
-  await expect(page.getByText('Delete doc?')).toBeVisible();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash')).toBeVisible();
   await page.getByTestId('trash-page').click();
   await getPageByTitle(page, 'Getting Started')
     .getByTestId('delete-page-button')

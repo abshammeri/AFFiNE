@@ -1,9 +1,5 @@
-import {
-  AnimatedDeleteIcon,
-  toast,
-  useConfirmModal,
-  useDropTarget,
-} from '@affine/component';
+import { AnimatedDeleteIcon, toast, useDropTarget } from '@affine/component';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import { MenuLinkItem } from '@affine/core/modules/app-sidebar/views';
 import { DocsService } from '@affine/core/modules/doc';
 import { GlobalContextService } from '@affine/core/modules/global-context';
@@ -16,7 +12,6 @@ import { useLiveData, useService } from '@toeverything/infra';
 export const TrashButton = () => {
   const t = useI18n();
   const docsService = useService(DocsService);
-  const { openConfirmModal } = useConfirmModal();
   const globalContextService = useService(GlobalContextService);
   const trashActive = useLiveData(globalContextService.globalContext.isTrash.$);
   const guardService = useService(GuardService);
@@ -34,43 +29,31 @@ export const TrashButton = () => {
           const docId = data.source.data.entity.id;
           const docRecord = docsService.list.doc$(docId).value;
           if (docRecord) {
-            openConfirmModal({
-              title: t['com.affine.moveToTrash.confirmModal.title'](),
-              description: t['com.affine.moveToTrash.confirmModal.description'](
-                {
-                  title: docRecord.title$.value || t['Untitled'](),
+            (async () => {
+              try {
+                const canTrash = await guardService.can(
+                  'Doc_Trash',
+                  docRecord.id
+                );
+                if (!canTrash) {
+                  toast(t['com.affine.no-permission']());
+                  return;
                 }
-              ),
-              confirmText: t.Delete(),
-              confirmButtonOptions: {
-                variant: 'error',
-              },
-              async onConfirm() {
-                try {
-                  const canTrash = await guardService.can(
-                    'Doc_Trash',
-                    docRecord.id
-                  );
-                  if (!canTrash) {
-                    toast(t['com.affine.no-permission']());
-                    return;
-                  }
-                  await docRecord.moveToTrash();
-                } catch (error) {
-                  console.error(error);
-                  const userFriendlyError = UserFriendlyError.fromAny(error);
-                  toast(
-                    t[`error.${userFriendlyError.name}`](userFriendlyError.data)
-                  );
-                }
-              },
-            });
+                await moveToTrashWithUndo([docRecord]);
+              } catch (error) {
+                console.error(error);
+                const userFriendlyError = UserFriendlyError.fromAny(error);
+                toast(
+                  t[`error.${userFriendlyError.name}`](userFriendlyError.data)
+                );
+              }
+            })().catch(console.error);
           }
         }
       },
       allowExternal: true,
     }),
-    [docsService.list, guardService, openConfirmModal, t]
+    [docsService.list, guardService, t]
   );
 
   return (

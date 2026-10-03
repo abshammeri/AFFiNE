@@ -27,10 +27,7 @@ test('New a page , then delete it in all pages, restore it', async ({
   await getPageOperationButton(page, newPageId).click();
   const deleteBtn = page.getByTestId('doc-list-operation-trash');
   await deleteBtn.click();
-  const confirmTip = page.getByRole('dialog', { name: 'Delete doc?' });
-  await expect(confirmTip).toBeVisible();
-
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByText('Moved to trash')).toBeVisible();
 
   await page.getByTestId('trash-page').click();
   await page.waitForTimeout(50);

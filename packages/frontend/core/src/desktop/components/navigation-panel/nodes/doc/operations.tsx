@@ -1,11 +1,6 @@
-import {
-  IconButton,
-  MenuItem,
-  MenuSeparator,
-  toast,
-  useConfirmModal,
-} from '@affine/component';
+import { IconButton, MenuItem, MenuSeparator, toast } from '@affine/component';
 import { usePageHelper } from '@affine/core/blocksuite/block-suite-page-list/utils';
+import { moveToTrashWithUndo } from '@affine/core/components/affine/move-to-trash-with-undo';
 import { Guard } from '@affine/core/components/guard';
 import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-app-setting-helper';
 import { useBlockSuiteMetaHelper } from '@affine/core/components/hooks/affine/use-block-suite-meta-helper';
@@ -53,7 +48,6 @@ export const useNavigationPanelDocNodeOperations = (
     CompatibleFavoriteItemsAdapter,
     GuardService,
   });
-  const { openConfirmModal } = useConfirmModal();
 
   const [addLinkedPageLoading, setAddLinkedPageLoading] = useState(false);
   const docRecord = useLiveData(docsService.list.doc$(docId));
@@ -83,25 +77,11 @@ export const useNavigationPanelDocNodeOperations = (
     if (!docRecord) {
       return;
     }
-    openConfirmModal({
-      title: t['com.affine.moveToTrash.title'](),
-      description: t['com.affine.moveToTrash.confirmModal.description']({
-        title: docRecord.title$.value,
-      }),
-      confirmText: t['com.affine.moveToTrash.confirmModal.confirm'](),
-      cancelText: t['com.affine.moveToTrash.confirmModal.cancel'](),
-      confirmButtonOptions: {
-        variant: 'error',
-      },
-      async onConfirm() {
-        await docRecord.moveToTrash();
-        track.$.navigationPanel.docs.deleteDoc({
-          control: 'button',
-        });
-        toast(t['com.affine.toastMessage.movedTrash']());
-      },
+    moveToTrashWithUndo([docRecord]).catch(console.error);
+    track.$.navigationPanel.docs.deleteDoc({
+      control: 'button',
     });
-  }, [docRecord, openConfirmModal, t]);
+  }, [docRecord]);
 
   const handleOpenInNewTab = useCallback(() => {
     workbenchService.workbench.openDoc(docId, {
