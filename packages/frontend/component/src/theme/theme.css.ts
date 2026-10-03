@@ -17,8 +17,7 @@ globalStyle('body', {
  * - WebKit honours `ui-sans-serif` (SF Arabic on Apple platforms).
  * - Chromium / Electron skip `ui-sans-serif`, so they use the bundled
  *   "IBM Plex Sans Arabic" (see fonts.css).
- * - If that font cannot load, Tahoma and Arial are removed from the stacks so
- *   the browser falls back to the operating system's Arabic font instead.
+ * - If that font cannot load, the theme's own fallbacks (e.g. Tahoma) apply.
  *
  * The stacks come from @toeverything/theme; we re-declare the variables on
  * `:root:root` so they win over the theme's `:root` rules (incl. print).
@@ -41,26 +40,20 @@ const withoutSystemAliases = (stack: string) =>
     .filter(f => f !== 'apple-system' && f !== 'BlinkMacSystemFont')
     .join(', ');
 const ARABIC_FALLBACKS = ['ui-sans-serif', "'IBM Plex Sans Arabic'"];
-const withoutArabicLegacyFonts = (stack: string) =>
-  stack
-    .split(',')
-    .map(f => f.trim())
-    .filter(f => f !== 'Tahoma' && f !== 'Arial')
-    .join(', ');
 const withGeist = (stack: string) =>
-  ["'Geist'", ...ARABIC_FALLBACKS, withoutArabicLegacyFonts(stack)].join(', ');
+  ["'Geist'", ...ARABIC_FALLBACKS, stack].join(', ');
 
 const sansFamily = withGeist(baseTheme.fontSansFamily);
 const fontFamily = withGeist(baseTheme.fontFamily);
 const serifFamily = insertAfterFirstFamily(
-  withoutArabicLegacyFonts(baseTheme.fontSerifFamily),
+  baseTheme.fontSerifFamily,
   'ui-serif',
   ...ARABIC_FALLBACKS
 );
 // keep the monospace fonts first, but use the Arabic fallbacks before the
 // generic system fallbacks for non-Latin text in code
 const monoFamily = insertBefore(
-  withoutArabicLegacyFonts(baseTheme.fontMonoFamily),
+  baseTheme.fontMonoFamily,
   'apple-system',
   ...ARABIC_FALLBACKS
 );
